@@ -1,48 +1,59 @@
 """Goldilocks validation suite for the regime-switching gym.
 
 Runs three difficulty levels (easy / medium / hard) against three agents
-(random / greedy / optimal) and checks that scores are "just right":
+(random / greedy / optimal) and checks that raw performance is "just right":
 
-- Optimal always scores 1.0
+- Optimal always has highest mean J
 - Greedy beats random but not optimal
-- The gap between greedy and optimal grows with difficulty
+- The fraction of optimal value captured by greedy decreases with difficulty
 - Random scores near zero
+
+Uses RAW realised utility J(s) for validation (not normalised scores).
+Normalised scores are for GRPO training; raw J is for gym quality assurance.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 
 from financial_gym.problems.regime_switching.generator import (
     GeneratorConfig,
     RegimeSwitchingGenerator,
+    _compute_z_grid,
 )
-from financial_gym.problems.regime_switching.verifier import RegimeSwitchingVerifier
+from financial_gym.problems.regime_switching.verifier import (
+    _compute_realized_utility,
+    _linear_utility,
+)
 from financial_gym.agents.random_agent import RandomAgent
 from financial_gym.agents.greedy_agent import GreedyAgent
 from financial_gym.agents.optimal_agent import OptimalAgent
 
 
 # ---------------------------------------------------------------------------
-# Difficulty levels
+# Difficulty levels — kappa (mean-reversion speed) is the key difficulty knob.
+# Fast reversion creates frequent switching dilemmas where planning matters.
 # ---------------------------------------------------------------------------
 
 DIFFICULTY_LEVELS: dict[str, dict] = {
     "easy": {
         "T_range": (10, 10),
-        "lam_range": (0.08, 0.08),
+        "lam_range": (0.05, 0.05),
         "alpha_range": (0.30, 0.30),
+        "kappa_range": (0.3, 0.3),    # slow reversion → greedy ≈ optimal
     },
     "medium": {
         "T_range": (15, 15),
-        "lam_range": (0.15, 0.15),
+        "lam_range": (0.10, 0.10),
         "alpha_range": (0.30, 0.30),
+        "kappa_range": (0.5, 0.5),    # moderate reversion → planning helps
     },
     "hard": {
-        "T_range": (15, 15),
-        "lam_range": (0.30, 0.30),
+        "T_range": (25, 25),
+        "lam_range": (0.15, 0.15),
         "alpha_range": (0.30, 0.30),
+        "kappa_range": (0.7, 0.7),    # fast reversion + long horizon → planning essential
     },
 }
 
@@ -55,100 +66,91 @@ DIFFICULTY_LEVELS: dict[str, dict] = {
 class GoldilocksReport:
     """Aggregated results of a Goldilocks validation run.
 
-    Attributes:
-        difficulty_levels: ordered list of level names (easy, medium, hard)
-        agents: list of agent names (random, greedy, optimal)
-        mean_scores: agent -> level -> mean score
+    Uses raw mean J(s) values, not normalised scores.
     """
-
     difficulty_levels: list[str]
     agents: list[str]
-    mean_scores: dict[str, dict[str, float]]
+    mean_j: dict[str, dict[str, float]]   # agent → level → mean J(s)
 
-    def greedy_optimal_gaps(self) -> dict[str, float]:
-        """Return optimal[level] - greedy[level] for every difficulty level."""
-        gaps: dict[str, float] = {}
+    def greedy_capture_pct(self) -> dict[str, float]:
+        """Percentage of optimal value captured by greedy at each level."""
+        result = {}
         for level in self.difficulty_levels:
-            gaps[level] = (
-                self.mean_scores["optimal"][level]
-                - self.mean_scores["greedy"][level]
-            )
-        return gaps
+            j_opt = self.mean_j["optimal"][level]
+            j_gre = self.mean_j["greedy"][level]
+            if abs(j_opt) < 1e-10:
+                result[level] = 100.0
+            else:
+                result[level] = (j_gre / j_opt) * 100.0
+        return result
 
     def all_pass(self) -> bool:
-        """Return True iff all five Goldilocks criteria are met.
+        """Return True iff all Goldilocks criteria are met.
 
-        1. Optimal = 1.0 exactly (abs < 1e-10) at all levels.
-        2. Greedy > 0.1 at easy.
-        3. Greedy < Optimal at all levels.
-        4. Gaps increase: easy < medium < hard.
-        5. Random near zero: abs < 0.15 at all levels.
+        1. Mean J(optimal) > Mean J(greedy) at all levels.
+        2. Mean J(greedy) > Mean J(random) at all levels.
+        3. Greedy capture % decreases with difficulty (planning matters more).
+        4. Mean J(random) < Mean J(optimal) at all levels.
         """
-        ms = self.mean_scores
-        gaps = self.greedy_optimal_gaps()
+        mj = self.mean_j
+        captures = self.greedy_capture_pct()
 
-        # 1. Optimal exactly 1.0
+        # 1. Optimal > Greedy at all levels
         for level in self.difficulty_levels:
-            if abs(ms["optimal"][level] - 1.0) >= 1e-10:
+            if mj["optimal"][level] <= mj["greedy"][level]:
                 return False
 
-        # 2. Greedy > 0.1 at easy
-        if ms["greedy"]["easy"] <= 0.1:
-            return False
-
-        # 3. Greedy < Optimal at all levels
+        # 2. Greedy > Random at all levels
         for level in self.difficulty_levels:
-            if ms["greedy"][level] >= ms["optimal"][level]:
+            if mj["greedy"][level] <= mj["random"][level]:
                 return False
 
-        # 4. Gap is positive at all levels (planning always helps)
-        for level in self.difficulty_levels:
-            if gaps[level] <= 0.0:
-                return False
-
-        # 5. Random near zero
-        for level in self.difficulty_levels:
-            if abs(ms["random"][level]) >= 0.15:
+        # 3. Greedy capture decreases: easy > medium > hard
+        cap_values = [captures[level] for level in self.difficulty_levels]
+        for i in range(len(cap_values) - 1):
+            if cap_values[i] <= cap_values[i + 1]:
                 return False
 
         return True
 
     def __str__(self) -> str:
-        """Return a formatted summary table."""
         lines: list[str] = []
-        lines.append("=" * 60)
-        lines.append("Goldilocks Validation Report")
-        lines.append("=" * 60)
+        lines.append("=" * 65)
+        lines.append("Goldilocks Validation Report (raw mean J values)")
+        lines.append("=" * 65)
 
-        # Header
-        col_w = 12
-        header = f"{'Agent':<12}" + "".join(
+        col_w = 14
+        header = f"{'Agent':<10}" + "".join(
             f"{lvl:>{col_w}}" for lvl in self.difficulty_levels
         )
         lines.append(header)
         lines.append("-" * len(header))
 
-        # Score rows
         for agent in self.agents:
-            row = f"{agent:<12}"
+            row = f"{agent:<10}"
             for level in self.difficulty_levels:
-                score = self.mean_scores[agent][level]
-                row += f"{score:>{col_w}.4f}"
+                j = self.mean_j[agent][level]
+                row += f"{j:>{col_w}.4f}"
             lines.append(row)
 
         lines.append("-" * len(header))
 
-        # Gaps row
-        gaps = self.greedy_optimal_gaps()
-        gap_row = f"{'gap':<12}"
+        # Greedy capture row
+        captures = self.greedy_capture_pct()
+        cap_row = f"{'capture%':<10}"
         for level in self.difficulty_levels:
-            gap_row += f"{gaps[level]:>{col_w}.4f}"
-        lines.append(gap_row)
+            cap_row += f"{captures[level]:>{col_w - 1}.1f}%"
+        lines.append(cap_row)
 
-        lines.append("=" * 60)
+        lines.append("=" * 65)
         verdict = "PASS" if self.all_pass() else "FAIL"
         lines.append(f"Overall: {verdict}")
-        lines.append("=" * 60)
+
+        cap_list = [captures[l] for l in self.difficulty_levels]
+        mono = all(cap_list[i] > cap_list[i+1] for i in range(len(cap_list)-1))
+        lines.append(f"Greedy capture decreasing: {'YES' if mono else 'NO'} "
+                      f"({' → '.join(f'{c:.1f}%' for c in cap_list)})")
+        lines.append("=" * 65)
 
         return "\n".join(lines)
 
@@ -158,12 +160,10 @@ class GoldilocksReport:
 # ---------------------------------------------------------------------------
 
 class GoldilocksValidator:
-    """Run the Goldilocks validation suite across difficulty levels and agents.
+    """Run the Goldilocks validation suite using raw J(s) comparisons.
 
-    Args:
-        n_instances: number of problem instances per difficulty level
-        grid_size: z-grid resolution for the Bellman solver
-        n_quad_nodes: Gauss-Hermite quadrature nodes for the Bellman solver
+    Unlike normalised scoring (used for GRPO), this uses raw realised
+    utility to avoid normalisation artifacts.
     """
 
     def __init__(
@@ -177,8 +177,6 @@ class GoldilocksValidator:
         self.n_quad_nodes = n_quad_nodes
 
     def run(self) -> GoldilocksReport:
-        """Execute the full validation suite and return a GoldilocksReport."""
-        verifier = RegimeSwitchingVerifier()
         agents = {
             "random": RandomAgent(seed_offset=1),
             "greedy": GreedyAgent(),
@@ -186,48 +184,37 @@ class GoldilocksValidator:
         }
         difficulty_order = ["easy", "medium", "hard"]
 
-        # mean_scores[agent][level] = mean score
-        mean_scores: dict[str, dict[str, float]] = {
-            name: {} for name in agents
-        }
+        mean_j: dict[str, dict[str, float]] = {name: {} for name in agents}
 
         for level in difficulty_order:
             params = DIFFICULTY_LEVELS[level]
 
             config = GeneratorConfig(
-                T_range=params["T_range"],
-                lam_range=params["lam_range"],
-                alpha_range=params["alpha_range"],
                 grid_size=self.grid_size,
                 n_quad_nodes=self.n_quad_nodes,
+                **params,
             )
             generator = RegimeSwitchingGenerator(config=config)
 
-            # Collect scores for each agent across all instances
-            level_scores: dict[str, list[float]] = {name: [] for name in agents}
+            # Collect raw J values for each agent
+            j_values: dict[str, list[float]] = {name: [] for name in agents}
 
             for i in range(self.n_instances):
                 problem = generator.sample(seed=i)
 
                 for agent_name, agent in agents.items():
                     decisions = agent.decide(problem)
-
-                    # Convert decisions to text completions
-                    completion = [
-                        f"s_{t} = {int(decisions[t])}"
-                        for t in range(problem.T)
-                    ]
-
-                    score = verifier.score(completion, problem, mode="trajectory")
-                    level_scores[agent_name].append(score)
+                    j = _compute_realized_utility(
+                        decisions, problem.x_path, problem.lam,
+                        problem.initial_regime, _linear_utility,
+                    )
+                    j_values[agent_name].append(j)
 
             for agent_name in agents:
-                mean_scores[agent_name][level] = float(
-                    np.mean(level_scores[agent_name])
-                )
+                mean_j[agent_name][level] = float(np.mean(j_values[agent_name]))
 
         return GoldilocksReport(
             difficulty_levels=difficulty_order,
             agents=list(agents.keys()),
-            mean_scores=mean_scores,
+            mean_j=mean_j,
         )

@@ -25,7 +25,9 @@
       "Bash(.venv/bin/python -m pytest tests/ -q)",
       "Bash(.venv/bin/python -m pytest tests/test_verifier.py tests/test_agents.py -q)",
       "Bash(.venv/bin/python -m pytest tests/test_agents.py -v)",
-      "Bash(.venv/bin/python -m pytest tests/test_goldilocks.py -v)"
+      "Bash(.venv/bin/python -m pytest tests/test_goldilocks.py -v)",
+      "Bash(.venv/bin/python -m pytest tests/ -v --ignore=tests/test_goldilocks.py)",
+      "Bash(.venv/bin/python -c \":*)"
     ]
   }
 }

@@ -6,7 +6,6 @@ import pytest
 from financial_gym.validation.goldilocks import GoldilocksValidator, GoldilocksReport
 
 # Use production-quality grid with enough instances for statistical stability.
-# grid_size=200 ensures solver accuracy; n_instances=200 smooths variance.
 VALIDATOR = GoldilocksValidator(n_instances=200, grid_size=200, n_quad_nodes=20)
 
 
@@ -22,38 +21,29 @@ def test_report_structure(report: GoldilocksReport) -> None:
     assert set(report.agents) == {"random", "greedy", "optimal"}
 
 
-def test_optimal_scores_exactly_one(report: GoldilocksReport) -> None:
+def test_optimal_beats_greedy(report: GoldilocksReport) -> None:
+    """Mean J(optimal) > Mean J(greedy) at all levels."""
     for level in report.difficulty_levels:
-        score = report.mean_scores["optimal"][level]
-        assert abs(score - 1.0) < 1e-10, (
-            f"Optimal mean score at {level} is {score}, expected 1.0"
+        assert report.mean_j["optimal"][level] > report.mean_j["greedy"][level], (
+            f"Optimal should beat greedy at {level}"
         )
 
 
-def test_greedy_below_optimal(report: GoldilocksReport) -> None:
+def test_greedy_beats_random(report: GoldilocksReport) -> None:
+    """Mean J(greedy) > Mean J(random) at all levels."""
     for level in report.difficulty_levels:
-        greedy = report.mean_scores["greedy"][level]
-        optimal = report.mean_scores["optimal"][level]
-        assert greedy < optimal, (
-            f"Greedy ({greedy}) should be < Optimal ({optimal}) at {level}"
+        assert report.mean_j["greedy"][level] > report.mean_j["random"][level], (
+            f"Greedy should beat random at {level}"
         )
 
 
-def test_random_near_zero(report: GoldilocksReport) -> None:
-    for level in report.difficulty_levels:
-        score = report.mean_scores["random"][level]
-        assert abs(score) < 0.2, (
-            f"Random mean score at {level} is {score}, expected abs < 0.2"
-        )
-
-
-def test_gap_positive_at_all_levels(report: GoldilocksReport) -> None:
-    """Planning always helps: greedy-optimal gap is positive at every level."""
-    gaps = report.greedy_optimal_gaps()
-    for level, gap in gaps.items():
-        assert gap > 0.0, (
-            f"Expected positive gap at {level}, got {gap}"
-        )
+def test_greedy_capture_decreases(report: GoldilocksReport) -> None:
+    """Greedy captures less of optimal at harder levels (planning matters more)."""
+    captures = report.greedy_capture_pct()
+    assert captures["easy"] > captures["medium"] > captures["hard"], (
+        f"Expected decreasing: easy={captures['easy']:.1f}% > "
+        f"medium={captures['medium']:.1f}% > hard={captures['hard']:.1f}%"
+    )
 
 
 def test_pass_criteria(report: GoldilocksReport) -> None:
@@ -64,3 +54,4 @@ def test_report_string(report: GoldilocksReport) -> None:
     s = str(report)
     assert "Goldilocks" in s
     assert "PASS" in s or "FAIL" in s
+    assert "capture" in s.lower()

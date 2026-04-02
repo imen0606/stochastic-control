@@ -164,16 +164,33 @@ class RegimeSwitchingVerifier(BaseVerifier):
             problem.initial_regime, utility_fn,
         )
 
-        # 5. Realized utility for random baseline (seeded with problem.seed)
-        s_random = _generate_random_decisions(T, problem.seed)
-        j_random = _compute_realized_utility(
-            s_random, problem.x_path, problem.lam,
-            problem.initial_regime, utility_fn,
-        )
+        # 5. Realized utility for random baseline
+        # Average over multiple seeds to avoid single-seed collisions,
+        # especially at short horizons where T=3 has only 8 possible sequences.
+        n_random_seeds = 20
+        j_randoms = []
+        for k in range(n_random_seeds):
+            s_rand_k = _generate_random_decisions(T, problem.seed * 1000 + k)
+            j_rand_k = _compute_realized_utility(
+                s_rand_k, problem.x_path, problem.lam,
+                problem.initial_regime, utility_fn,
+            )
+            j_randoms.append(j_rand_k)
+        j_random = float(np.mean(j_randoms))
 
         # 6. Regret-normalised score
-        denom = max(j_star - j_random, 1e-6)
-        return float((j_model - j_random) / denom)
+        gap = j_star - j_random
+        if gap <= 1e-6:
+            # Degenerate instance — optimal and random are indistinguishable.
+            # If model matches optimal exactly, score 1.0 (preserves invariant).
+            # Otherwise score 0.0 (uninformative instance).
+            if abs(j_model - j_star) < 1e-10:
+                return 1.0
+            return 0.0
+        raw_score = (j_model - j_random) / gap
+        # Clip to prevent outliers from tiny denominators dominating means.
+        # Does not affect GRPO (which normalises within groups).
+        return float(np.clip(raw_score, -2.0, 2.0))
 
     # ------------------------------------------------------------------
     # Private helpers

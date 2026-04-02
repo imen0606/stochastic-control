@@ -13,7 +13,19 @@
       "Bash(/Users/imen/Documents/stochastic_control/.venv/bin/python3 --version)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(/Users/imen/Documents/stochastic_control/.venv/bin/pip install:*)",
+      "Bash(/Users/imen/Documents/stochastic_control/.venv/bin/pip show:*)",
+      "Bash(.venv/bin/python -m pytest tests/test_base.py -v)",
+      "Bash(git rm:*)",
+      "Bash(.venv/bin/python -m pytest tests/test_generator.py -x --tb=short)",
+      "Bash(.venv/bin/python -m pytest tests/test_generator.py -v)",
+      "Bash(.venv/bin/python -m pytest tests/ -v)",
+      "Bash(.venv/bin/python -m pytest tests/test_generator.py -q)",
+      "Bash(.venv/bin/python -m pytest tests/ -q)",
+      "Bash(.venv/bin/python -m pytest tests/test_verifier.py tests/test_agents.py -q)",
+      "Bash(.venv/bin/python -m pytest tests/test_agents.py -v)",
+      "Bash(.venv/bin/python -m pytest tests/test_goldilocks.py -v)"
     ]
   }
 }

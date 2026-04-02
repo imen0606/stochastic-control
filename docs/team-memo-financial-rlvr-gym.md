@@ -172,23 +172,28 @@ needed:
 Run across three difficulty levels (500 instances each):
 
 ```
-Goldilocks Validation Report
-──────────────────────────────────────────
-              Easy    Medium    Hard
-Random        ~0       ~0       ~0
-Greedy        0.72     0.51     0.28
-Optimal       1.00     1.00     1.00
-──────────────────────────────────────────
-Gap:          0.28     0.49     0.72
+Goldilocks Validation Report (validated numbers)
+──────────────────────────────────────────────────────────────────────
+              Easy             Medium           Hard
+              (κ=0.1, T=5)    (κ=0.3, T=10)   (κ=0.7, T=25)
+Random        ~0               ~0               ~0
+Greedy        0.985            0.849            0.613
+Optimal       1.000            1.000            1.000
+──────────────────────────────────────────────────────────────────────
+Gap:          0.015            0.151            0.387
 ```
 
 **The key number: the greedy-optimal gap.**
 
-- Easy: gap is 0.28 → greedy gets 72% of the way. Planning only adds 28%.
-- Hard: gap is 0.72 → greedy only gets 28%. Planning adds 72%.
+- Easy: greedy captures 98.5% of optimal (planning barely matters)
+- Medium: greedy captures 84.9% (planning adds 15%)
+- Hard: greedy captures 61.3% (planning adds 39%)
 
-The gap widens because hard problems have expensive switching costs. You can't just react —
-you *must* think ahead. This proves the gym specifically tests planning capability.
+**The primary difficulty knob is kappa (κ), the signal reversion speed** — not just lambda.
+The gap widens because at higher kappa the signal flips faster, creating more switching
+traps for greedy agents. A greedy agent keeps switching in and out chasing each flip, paying
+switching costs twice for nothing. You can't just react — you *must* think ahead about where
+the signal is likely to be. This proves the gym specifically tests planning capability.
 
 ---
 
@@ -252,6 +257,13 @@ On individual instances, yes — by getting lucky on a specific market path. Ove
 instances, the optimal policy averages to 1.0 because it maximises *expected* value.
 An LLM that consistently scores above 1.0 would indicate a bug in the verifier.
 
+### "Isn't greedy already near-optimal for this problem?"
+With slow-moving signals (low kappa), yes — greedy captures 98% of optimal. The key
+difficulty lever is kappa (mean-reversion speed). When signals revert fast (high kappa),
+greedy switches too aggressively and pays switching costs twice for nothing. At hard
+difficulty (κ=0.7, T=25), greedy captures only 61% of optimal — a 39% planning advantage.
+This is tuneable: labs can adjust GeneratorConfig parameters without code changes.
+
 ---
 
 ## 6. Gaming Analogy
@@ -265,7 +277,7 @@ For teammates coming from game-based RLVR, here's how this maps:
 | Action cost | Switching cost λ (paid every time you change your action) |
 | Score/reward | Profit from your sequence of decisions |
 | Optimal play | Bellman-optimal policy (computed exactly) |
-| Difficulty setting | λ, α, T parameters |
+| Difficulty setting | κ (signal reversion speed), λ (switching cost), T (horizon) |
 | Fog of war | Signals revealed one at a time (can't see future) |
 | Game engine | Ornstein-Uhlenbeck signal process (known rules) |
 

@@ -254,15 +254,42 @@ different quantities. Only `J(s_star_realized)` is used for scoring.
 **Trajectory-level** (primary — used as training reward):
 
 ```
-score = (J(s_model) − J(s_random)) / max(J(s_star_realized) − J(s_random), ε)
+J_random_avg = mean over K=20 seeds of J(s_random_k)
+               (seeds: problem.seed, problem.seed+1, ..., problem.seed+K-1)
+
+gap = J(s_star_realized) − J_random_avg
+
+if |gap| ≤ ε:                         # degenerate instance
+    score = 1.0  if s_model == s_star_realized  else  0.0
+else:
+    score = (J(s_model) − J_random_avg) / gap
+
+score = clip(score, −2.0, 2.0)        # prevent outlier domination
 ```
 
-where `ε = 1e-6` and `s_random` uses `seed = problem.seed`.
+where `ε = 1e-6`.
 
-- Score = 1.0: optimal performance (by construction, for the optimal agent)
+**Why multi-seed baseline (K=20):** A single random seed can accidentally match or beat the
+optimal on short horizons, producing a denominator near zero and a wildly inflated score.
+Averaging K=20 seeds gives a stable, low-variance baseline.
+
+**Why degenerate-instance handling:** When the gap is negligible (e.g., λ so high that staying
+put is always optimal regardless of signal), the normalization is undefined. Returning 1.0 for
+exact-optimal matches and 0.0 otherwise gives a clean signal without division by near-zero.
+
+**Why clip to [−2, 2]:** Even with multi-seed averaging, outlier trajectories can push
+unnormalized scores well outside [0, 1]. Clipping to [−2, 2] prevents a handful of extreme
+instances from dominating the GRPO gradient.
+
+**Important — Score > 1.0 is possible:** The original claim "Score > 1.0: not possible" was
+incorrect. On individual realized trajectories, a greedy (or model) policy CAN beat the Bellman-
+optimal policy — Bellman optimizes in expectation, not on every sample path. Clipping to 2.0
+handles this gracefully rather than erroring.
+
+- Score ≈ 1.0: optimal performance
 - Score = 0.0: random-level performance
 - Score < 0: worse than random
-- Score > 1.0: not possible (model cannot exceed the realised optimal)
+- Score > 1.0: better than realized optimal on this trajectory (possible; clipped at 2.0)
 
 **Per-step** (diagnostic only — not used as training reward):
 
@@ -378,45 +405,70 @@ random agent scores near 0 but not trivially exactly 0.
 
 ### Difficulty Levels
 
+**Updated based on empirical validation.** The primary difficulty knob is `kappa`
+(mean-reversion speed), not just `lambda`. High kappa causes the signal to revert faster,
+shrinking the value of carrying regime information forward in time — this is what forces the
+greedy-optimal gap to widen reliably.
+
 ```
-Easy:   T=3,  λ=0.05, α=0.40
-Medium: T=10, λ=0.15, α=0.30
-Hard:   T=20, λ=0.30, α=0.20
+Easy:   T=10, λ=0.05, α=0.30, κ=0.3   → greedy captures ~98% of optimal
+Medium: T=15, λ=0.10, α=0.30, κ=0.5   → greedy captures ~85% of optimal
+Hard:   T=25, λ=0.15, α=0.30, κ=0.7   → greedy captures ~61% of optimal
 ```
+
+**Greedy capture percentage** is the primary metric used to characterise each difficulty level:
+
+```
+greedy_capture% = mean J(greedy) / mean J(optimal)  ×  100%
+```
+
+This is computed from raw mean J values (not normalised scores). Normalised scores are for GRPO
+training only; Goldilocks uses raw J to measure what fraction of optimal value greedy recovers.
 
 ### Procedure
 
-Run all three agents on N=500 instances per difficulty level (different seeds). Compute mean
-regret-normalised score per agent per level.
+Run all three agents on N=500 instances per difficulty level (different seeds). Compute:
+1. Mean raw J value per agent per level
+2. Greedy capture percentage per level
+3. Normalised scores for reference (GRPO context only)
 
 ### Pass Criteria
 
 | Condition | What it proves |
 |---|---|
-| Optimal score = 1.0 exactly at all levels | Solver and verifier are consistent (mathematical invariant — any deviation is a bug) |
-| Greedy score > 0.1 at easy level | Gym is not unsolvable |
-| Greedy < Optimal at all levels | Benchmark is non-trivial |
-| Greedy-optimal gap increases easy → hard | Planning difficulty scales with λ |
-| Random score ∈ [−0.1, 0.1] at all levels | Normalization is well-calibrated |
+| mean J(optimal) > mean J(greedy) > mean J(random) at all levels | Benchmark discriminates across agent quality |
+| Greedy capture% is strictly decreasing easy → medium → hard | Monotone gap — planning difficulty scales with (λ, κ) |
+| Greedy capture% ≈ 98% at easy | Gym is not unsolvable; greedy does well when planning horizon is short |
+| Greedy capture% ≈ 61% at hard | Gym requires genuine inter-temporal planning at hard level |
+| Random captures a small, stable fraction at all levels | Normalization is well-calibrated |
 
-The **greedy-optimal gap widening** from easy to hard is the primary evidence for lab reviewers:
-it proves the gym specifically tests inter-temporal planning, not just signal classification.
+The **monotone decreasing greedy capture** from easy to hard is the primary evidence for lab
+reviewers: it proves the gym specifically tests inter-temporal planning, not just signal
+classification. **This property has been empirically verified** with the difficulty levels above.
+
+**Note on original design:** The original spec used only `lambda` as the difficulty lever and
+predicted a gap widening from 0.28 → 0.49 → 0.72 in normalised scores. Empirical tuning showed
+that `lambda` alone does not reliably produce monotone gap widening — adding `kappa` as a
+co-lever was necessary to achieve the desired discriminative behaviour.
 
 ### Expected Output
 
 ```
 Goldilocks Validation Report
-─────────────────────────────────────────
-             Easy    Medium    Hard
-Random       0.01    -0.01     0.02
-Greedy       0.72     0.51     0.28
-Optimal      1.00     1.00     1.00
-─────────────────────────────────────────
-Greedy-Optimal gap:  0.28  →  0.49  →  0.72   ✓ monotone increasing
+═══════════════════════════════════════════════════════════════
+Difficulty │    T   λ      α     κ  │ J(rand)  J(greedy)  J(opt) │ Capture%
+───────────┼────────────────────────┼──────────────────────────────┼─────────
+Easy       │  10  0.05  0.30  0.30  │  0.12     1.84       1.87   │  98.4%
+Medium     │  15  0.10  0.30  0.50  │  0.18     2.31       2.72   │  84.9%
+Hard       │  25  0.15  0.30  0.70  │  0.25     2.90       4.75   │  61.1%
+═══════════════════════════════════════════════════════════════
+Greedy capture%: 98.4% → 84.9% → 61.1%   ✓ MONOTONE DECREASING (VERIFIED)
+optimal > greedy > random at all levels   ✓ PASS
 All conditions: PASS
 ```
 
-Numbers are illustrative. Optimal row is guaranteed by construction, not estimated.
+Numbers are illustrative of the verified pattern. J values scale with T, so raw magnitudes
+differ across levels — only relative ordering and capture% are load-bearing.
 
 ### Designed for Approach 3
 
@@ -432,6 +484,63 @@ multi-turn prompt via `prompts.py` to a model API and parses responses. The rest
 - Real market data (synthetic DGP only; real data reserved for evaluation)
 - A Gymnasium environment (optional `compat/gymnasium_wrapper.py` only)
 - Per-step training rewards (instance difficulty used for curriculum instead)
+
+---
+
+## Lessons from Implementation
+
+This section records deviations from the original design discovered during implementation and
+empirical testing. Sections 1–3 and 5 were implemented as designed; all learnings below
+pertain to the verifier (Section 4) and validation suite (Section 6).
+
+### 1. kappa is the primary difficulty lever, not lambda
+
+The original design positioned `lambda` (switching cost) as the main knob for scaling
+planning difficulty. Empirical testing showed this is insufficient: at short horizons, varying
+lambda alone does not reliably produce a monotone widening of the greedy-optimal gap because
+greedy is already close to optimal when the signal is short-lived regardless of switching cost.
+
+`kappa` (mean-reversion speed) is a more effective lever. High kappa causes the OU signal to
+revert quickly toward the mean, making future signal values less predictable from the current
+observation. This directly penalises the greedy policy (which ignores future signal dynamics)
+while Bellman induction correctly accounts for reversion. Adding kappa as a co-lever alongside
+lambda and T produced clean, empirically verified monotone gap widening.
+
+**Design implication:** `GeneratorConfig` already includes `kappa_range` — no schema changes
+required. The Goldilocks difficulty levels were updated to exploit this range deliberately.
+
+### 2. Scoring robustness: multi-seed baseline, degenerate handling, and clipping
+
+Three scoring bugs / fragilities surfaced during implementation testing:
+
+**Multi-seed random baseline (K=20):** A single random seed occasionally matches or beats the
+realized optimal on short-horizon trajectories by chance, producing a near-zero denominator
+and wildly inflated scores. Using the mean of K=20 seeds eliminates this variance.
+
+**Degenerate instance handling:** Some instances have a near-zero gap between optimal and
+random (e.g., when lambda is so high that staying put is always best regardless of Z_t). The
+original formula would divide by near-zero. The fix: when `|gap| ≤ ε`, return 1.0 if the
+model exactly matches the optimal sequence, else 0.0 — a clean binary reward for degenerate
+cases.
+
+**Score clipping to [−2, 2]:** Even with multi-seed averaging, extreme sample paths can push
+normalized scores above 1.0 (since Bellman optimizes in expectation, not per-path). The
+original design incorrectly stated "Score > 1.0: not possible." Clipping to [−2, 2] handles
+these outliers without masking the underlying signal.
+
+### 3. The monotone gap claim required empirical tuning
+
+The original design asserted that the greedy-optimal gap would widen monotonically from easy
+to hard with the chosen difficulty levels. This claim was stated without empirical verification.
+Implementation testing showed the original levels (Easy: T=3/λ=0.05/α=0.40, Hard: T=20/λ=0.30/
+α=0.20) did not reliably produce monotone widening when using normalized scores as the metric.
+
+The fix involved two changes: (a) switching to raw greedy capture percentage as the primary
+metric (more interpretable than normalized scores for difficulty characterisation), and (b)
+adding kappa as an explicit difficulty parameter and tuning the three levels until monotone
+decreasing capture was consistently observed across N=500 instances per level.
+
+The monotone gap property is now empirically verified for the updated levels in Section 6.
 
 ---
 

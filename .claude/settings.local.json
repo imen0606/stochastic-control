@@ -27,7 +27,10 @@
       "Bash(.venv/bin/python -m pytest tests/test_agents.py -v)",
       "Bash(.venv/bin/python -m pytest tests/test_goldilocks.py -v)",
       "Bash(.venv/bin/python -m pytest tests/ -v --ignore=tests/test_goldilocks.py)",
-      "Bash(.venv/bin/python -c \":*)"
+      "Bash(.venv/bin/python -c \":*)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(.venv/bin/python scripts/eval_llm.py)",
+      "Bash(.venv/bin/python -m pytest tests/ --ignore=tests/test_goldilocks.py -v)"
     ]
   }
 }

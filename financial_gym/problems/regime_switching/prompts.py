@@ -5,28 +5,39 @@ from financial_gym.problems.regime_switching.generator import RegimeSwitchingPro
 def setup_prompt(problem: RegimeSwitchingProblem) -> str:
     """Generate Turn 0 setup message.
 
+    The prompt explicitly states the payoff structure so the model
+    understands what each action means financially.
+
     Args:
         problem: RegimeSwitchingProblem instance with parameters and initial regime.
 
     Returns:
         Setup prompt string for the initial conversation turn.
     """
+    ir_label = "ON" if problem.initial_regime == 1 else "OFF"
     return (
-        f"You are managing a momentum trading strategy over T={problem.T} steps.\n"
+        f"You are managing a trading strategy over T={problem.T} steps.\n"
         f"\n"
-        f"Parameters:\n"
-        f"  Switching cost:   λ = {problem.lam:.4f}\n"
-        f"  Signal strength:  α = {problem.alpha:.4f}\n"
-        f"  Expected PnL:     E[X_{{t+1}} | Z_t] = α · Z_t = {problem.alpha:.4f} · Z_t\n"
-        f"  Initial regime:   s_{{-1}} = {problem.initial_regime}\n"
+        f"RULES:\n"
+        f"- At each step t, you choose s_t = 1 (ON) or s_t = 0 (OFF).\n"
+        f"- If ON (s_t=1): you earn the PnL for that step. "
+        f"Expected PnL = {problem.alpha:.4f} x Z_t.\n"
+        f"- If OFF (s_t=0): you earn nothing (PnL = 0).\n"
+        f"- Every time you SWITCH (change from ON to OFF or OFF to ON), "
+        f"you pay a cost of {problem.lam:.4f}.\n"
+        f"- If you stay in the same state, no switching cost.\n"
         f"\n"
-        f"At each step you observe signal Z_t and decide to activate (s_t=1)\n"
-        f"or deactivate (s_t=0) the strategy. Switching from your previous\n"
-        f"decision costs λ = {problem.lam:.4f}, deducted from that step's PnL.\n"
+        f"YOUR GOAL: Maximize total profit = sum of PnL earned "
+        f"minus switching costs paid.\n"
         f"\n"
-        f"You will receive one observation at a time. At each step, reason\n"
-        f"about the immediate expected PnL, the switching cost, and whether\n"
-        f"the signal is likely to persist before stating your decision."
+        f"PARAMETERS:\n"
+        f"  Signal strength: alpha = {problem.alpha:.4f}\n"
+        f"  Switching cost:  lambda = {problem.lam:.4f}\n"
+        f"  Starting state:  s_{{-1}} = {problem.initial_regime} ({ir_label})\n"
+        f"  Horizon:         T = {problem.T} steps\n"
+        f"\n"
+        f"You will receive one signal observation Z_t at a time.\n"
+        f"State your decision as: s_t = 0 or s_t = 1"
     )
 
 
@@ -39,7 +50,10 @@ def step_prompt(t: int, z_t: float, prev_regime: int) -> str:
         prev_regime: Previous regime s_{t-1} (or s_{-1} if t=0).
 
     Returns:
-        Step prompt string with current observation.
+        Step prompt string with current observation and state.
     """
-    regime_label = f"s_{{-1}}" if t == 0 else f"s_{{{t-1}}}"
-    return f"t={t} | Z_{t} = {z_t:+.4f} | Previous regime: {regime_label} = {prev_regime}"
+    state = "ON" if prev_regime == 1 else "OFF"
+    return (
+        f"t={t} | Z_t = {z_t:+.4f} | "
+        f"You are currently {state} (s_prev = {prev_regime})"
+    )

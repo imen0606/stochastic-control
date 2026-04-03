@@ -30,7 +30,11 @@
       "Bash(.venv/bin/python -c \":*)",
       "Bash(.venv/bin/pip install:*)",
       "Bash(.venv/bin/python scripts/eval_llm.py)",
-      "Bash(.venv/bin/python -m pytest tests/ --ignore=tests/test_goldilocks.py -v)"
+      "Bash(.venv/bin/python -m pytest tests/ --ignore=tests/test_goldilocks.py -v)",
+      "Bash(.venv/bin/python scripts/plot_landscape.py)",
+      "Bash(.venv/bin/python scripts/plot_3d_surfaces.py)",
+      "Bash(.venv/bin/python scripts/eval_opus_buckets.py)",
+      "Bash(.venv/bin/python:*)"
     ]
   }
 }

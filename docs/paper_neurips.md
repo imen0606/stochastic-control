@@ -221,7 +221,23 @@ We partition the 750 decisions into two buckets based on the *solver's* policies
 
 This partition is computed entirely from the solver, requiring no additional LLM queries. It extracts maximum diagnostic information from limited evaluation budgets by separating two distinct capabilities: comprehension (understanding the problem) and planning (reasoning about the future).
 
-### 6.3 Results
+### 6.3 Temporal Distribution of Hard Decisions
+
+Hard decisions are not concentrated at the beginning of the episode --- they are spread across the full trajectory. Among the 125 hard decisions in the Opus evaluation:
+
+| Episode phase | Prior signals seen | Share of hard decisions |
+|--------------|-------------------|------------------------|
+| Early ($t = 0$--$2$) | 0--2 | 15% |
+| Mid ($t = 3$--$15$) | 3--15 | 53% |
+| Late ($t = 16+$) | 16+ | 32% |
+
+The average and median hard decision occurs at $t = 11$, meaning the model has already observed approximately 11 prior signal values when it faces a decision that requires forward-looking reasoning.
+
+This is a meaningful quantity of history. With 11 prior observations of an OU process, the agent has sufficient data to form an empirical estimate of signal persistence. Yet Opus still follows greedy logic on 95.2% of hard decisions, including those encountered at mid-episode where the history is abundant.
+
+This rules out a simple information-deficit explanation: the model is not failing because it lacks data about the signal process. The failure persists even when the signal history is rich enough to potentially infer $\kappa$. This suggests a genuine reasoning gap --- the model does not perform the inference from observed signal autocorrelation to future persistence, and even if it did, it does not translate that persistence estimate into a forward-looking switching decision. The gap is in dynamic reasoning, not in information availability.
+
+### 6.4 Results
 
 **Easy bucket.** Opus correctly matches the optimal (= greedy) policy on 484 of 625 easy decisions, yielding an accuracy of **77.4%**. The 22.6% error rate on easy decisions represents a comprehension gap --- failures of basic signal interpretation or payoff calculation, not planning failures.
 
@@ -246,7 +262,7 @@ This partition is computed entirely from the solver, requiring no additional LLM
 
 Opus significantly outperforms random but significantly underperforms greedy. The Greedy vs. Optimal comparison is not significant at $N = 30$; this is expected given the small per-instance $J$ difference ($+1.19$ vs. $+1.30$) and is confirmed by separate Goldilocks analysis at $N = 500$ instances.
 
-### 6.4 Failure Modes
+### 6.5 Failure Modes
 
 Manual inspection of Opus transcripts reveals two qualitatively distinct failure modes:
 
@@ -268,13 +284,37 @@ The two-bucket analysis reveals that Opus's underperformance relative to greedy 
 
 2. **Planning gap** (95% greedy-like on hard decisions): On the 125 decisions where forward-looking reasoning is required, Opus follows greedy logic almost perfectly. There is no evidence that the model reasons about future signal persistence or amortizes switching costs over time.
 
-### 7.2 Implications for RLVR Training
+### 7.1.1 Reasoning Quality vs. Reasoning Scope
+
+A manual step-by-step test provided an important qualification to the planning gap finding. When Opus is walked through a single hard decision interactively, its reasoning is qualitatively sophisticated: the model tracks cumulative savings from prior steps, computes round-trip switching costs, notes the remaining horizon, and articulates trade-offs between immediate cost and future opportunity. The model is not computationally incoherent --- it performs the static calculations correctly. The failure is specifically on the dynamic question: when the immediate cost-benefit of greedy favors one action but the persistence of the signal over the remaining horizon favors another, the model cannot override its greedy framework. Presented with a persistent positive signal in the disagreement zone ($z \approx 0.35$, current state OFF), Opus consistently stays OFF because $\alpha \cdot z = 0.105 < \lambda = 0.15$, even when the remaining horizon is long and the signal is demonstrably slow-reverting. The gap is not in static computation or in the quality of local reasoning --- it is in the ability to perform dynamic programming reasoning: recognizing that the value of switching ON must include the expected future gains, not merely the immediate step gain. This distinction matters for RLVR training: the goal is not to improve static payoff calculation but to elicit the specific capability of multi-step amortization reasoning.
+
+### 7.2 Prompt Scaffolding and Latent Planning Capability
+
+A follow-up manual test complicates the picture without improving it.
+
+After the API evaluation (Section 6), we conducted two additional tests of Claude Opus 4 on the same gym configuration ($\kappa = 0.1$, $\lambda = 0.15$, $\alpha = 0.30$, $T = 25$):
+
+**Test 1 — API evaluation format (Section 6):** The prompt provides the rules, current signal, current state, and asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 4.8% planning rate on hard decisions ($N = 30$ instances, 125 hard decisions).
+
+**Test 2 — Scaffolded prompt (manual test, seed = 47):** The prompt was augmented to pre-compute Option A and Option B with exact numbers, explicitly highlight the trend ("6 consecutive steps trending up"), include the instruction "Consider whether the signal is likely to persist," and display the number of steps remaining. Result: Opus matched the optimal policy on 25 of 25 decisions, including the one hard decision in that episode (at $t = 8$, the model switched ON at $Z = +0.35$, below the greedy threshold of $0.50$). The model's reasoning explicitly cited signal persistence and amortization.
+
+The 4.8% vs.\ 100% comparison should not be read as evidence that the model can plan when prompted correctly. The scaffolded prompt essentially performed the planning for the model: it pre-computed the arithmetic, identified the pattern the model needed to notice, and directly suggested the reasoning strategy. Passing the scaffolded test is analogous to answering an exam question when the answer sheet is included in the question. The model followed the scaffold; it did not plan independently.
+
+A real trader receives raw data. Pre-computing option values, flagging signal trends, and explicitly prompting persistence reasoning are not available at inference time in any realistic setting. The scaffolded prompt eliminates the cognitive steps that define the planning task.
+
+The honest interpretation of this experiment is therefore the reverse of an encouraging one: the fact that a heavily scaffolded prompt is required to elicit correct behavior on even a single hard decision confirms that the planning capability is not spontaneously available. It is latent in the sense that the model can follow a planning scaffold when one is provided, but this is a weak form of capability. The model cannot construct the scaffold itself.
+
+This has a direct implication for prompt design in the gym. The evaluation prompt should provide clear, unambiguous rules — the payoff structure, switching cost, signal coefficient — but must not scaffold the reasoning. A prompt that pre-computes options, highlights trends, or suggests persistence reasoning trivializes the gym: any model capable of following instructions will pass. The current API evaluation prompt (clear rules, no reasoning scaffold) is the appropriate level. The scaffolded prompt reveals latent capability but is unsuitable for evaluation or for RLVR training, because it removes the very reasoning steps the training is intended to produce.
+
+For RLVR, this suggests a concrete training objective: internalize the scaffold. The model must learn, without being told, to compute option values, track signal autocorrelation, and translate persistence estimates into forward-looking switching decisions. The scaffolded prompt can serve as a behavioral target — describing what the model should eventually do spontaneously — but it cannot serve as the training prompt, because it removes the reasoning gap that RLVR is supposed to close.
+
+### 7.3 Implications for RLVR Training
 
 The near-zero planning rate on hard decisions suggests that forward-looking financial reasoning is not an emergent capability of current frontier LLMs, even with careful prompting. This provides a concrete, measurable target for RLVR training. The gym's exact ground truth and regret-normalized scoring make it directly compatible with GRPO and related policy gradient methods.
 
 The two-bucket methodology offers a training diagnostic: monitoring easy-bucket accuracy tracks comprehension improvement, while hard-bucket planning rate tracks the emergence of genuine forward-looking reasoning. An effective RLVR training run should improve both, but the planning rate is the more informative metric.
 
-### 7.3 Relationship to Existing Work
+### 7.4 Relationship to Existing Work
 
 FinRL (Liu et al., 2020) provides simulation-based RL environments for portfolio management, order execution, and market making, but lacks computable optimal solutions and therefore cannot serve as an RLVR gym. Almgren and Chriss (2001) derive closed-form optimal execution strategies, but in a continuous setting without the discrete decision structure needed for LLM evaluation. Our work complements these by providing a minimal but exactly solvable problem that isolates the planning capability.
 
@@ -297,6 +337,8 @@ We aim for full transparency about the current limitations of this work.
 **Stationary signal process.** The OU process is stationary and time-homogeneous, unlike real financial markets. Non-stationary dynamics, structural breaks, and fat-tailed distributions are not captured. The gym tests reasoning about a known, well-behaved DGP; transfer to real financial decision-making is entirely unvalidated.
 
 **No training results.** We provide the gym infrastructure and a baseline evaluation, but we have not conducted RLVR training (e.g., GRPO). We cannot claim that the gym will successfully train planning capabilities; we only show that the capability is currently absent and measurable.
+
+**Asymmetric $\kappa$ knowledge.** The current gym provides $\kappa$ to the optimal agent as a known parameter but does not reveal $\kappa$ to the LLM. While the temporal distribution analysis (Section 6.3) shows that hard decisions occur at mid-episode where the model has substantial signal history from which $\kappa$ could in principle be inferred, the comparison is not fully apples-to-apples. A POMDP formulation in which the optimal policy is also required to infer $\kappa$ from observations --- rather than treating it as known --- would make the performance comparison strictly fair. The current setup likely understates the LLM's disadvantage in information terms, though the persistence of failures even at $t = 11$ (with abundant history) suggests that the gap is not primarily attributable to this asymmetry.
 
 **Prompt sensitivity.** LLM performance is sensitive to prompt phrasing. Our improved prompt raised $T = 1$ accuracy from 20% to 80%. This means evaluation results are partially a function of prompt quality, not only model capability. We report both prompt versions in Appendix E.
 
@@ -335,6 +377,8 @@ Several directions extend naturally from this work.
 Each additional problem type adds structural diversity to the suite, addressing the single-problem limitation of the current gym.
 
 **Multi-dimensional signals.** The paper's framework (Bilokon, 2026) allows $Z_t$ to take values in a Polish space $E$, which includes $\mathbb{R}^n$. Extending from a scalar signal to a vector of market features (momentum, volatility, volume) would increase problem complexity while remaining within the theoretical framework. The Bellman solver would require a multi-dimensional grid or function approximation, increasing computational cost but not changing the verification principle.
+
+**Hidden regime detection (v2).** A more challenging and epistemically richer extension is to make $\kappa$ itself latent. At the start of each episode, $\kappa$ is drawn from a binary set $\{\kappa_{\text{low}}, \kappa_{\text{high}}\}$ (e.g., $\{0.1, 0.7\}$) with known prior probability, but the agent is not told which regime it is in. The agent must infer the current $\kappa$ from the observed signal history and simultaneously plan over the switching decisions. The optimal policy is computed via a POMDP with belief state over $\kappa$ --- a distribution that is updated by Bayesian filtering at each step. This formulation addresses the asymmetric information limitation of the current gym (Section 8) by requiring the optimal agent to also infer persistence from data, making the comparison fair. More importantly, it raises the cognitive bar: a correct response requires (i) learning the signal's autocorrelation structure from the episode history, (ii) maintaining and updating a belief over regimes, and (iii) translating that belief into a forward-looking switching decision. This is much harder to dismiss as "just math" --- the model must reason about model uncertainty, not merely about known-parameter optimization. The v2 gym is directly motivated by the finding that Opus fails on 95% of hard decisions even at $t = 11$, when the signal history is sufficient to distinguish $\kappa_{\text{low}}$ from $\kappa_{\text{high}}$ with high confidence. The failure is in inference and planning jointly, and a POMDP formulation directly isolates this capability.
 
 **Non-stationary dynamics.** Real financial markets exhibit regime changes, structural breaks, and time-varying parameters. Extending the OU process to allow time-varying $\kappa_t$ or $\sigma_{z,t}$ would test planning under non-stationarity. The Bellman recursion remains valid for time-inhomogeneous Markov processes; only the transition kernel changes at each step.
 

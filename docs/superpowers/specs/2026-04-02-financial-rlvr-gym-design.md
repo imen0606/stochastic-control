@@ -764,6 +764,37 @@ normalized scores above 1.0 (since Bellman optimizes in expectation, not per-pat
 original design incorrectly stated "Score > 1.0: not possible." Clipping to [−2, 2] handles
 these outliers without masking the underlying signal.
 
+### 6. Prompt design is an evaluation variable, not a delivery format
+
+Manual testing revealed that the model's failure to plan is partly prompt-dependent. This does not mean the model can plan; it means the evaluation result is sensitive to how much reasoning the prompt performs on the model's behalf.
+
+**Two tests, same gym, same model:**
+
+- **Test 1 — API evaluation format:** Prompt states the rules, shows the current signal and state, asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 4.8% planning rate on hard decisions (N=30 instances, 125 hard decisions). The model followed greedy logic on 95.2% of hard decisions.
+
+- **Test 2 — Scaffolded prompt (seed=47, manual test):** Prompt pre-computes Option A and Option B with exact numbers, explicitly notes "6 consecutive steps trending up," includes "Consider whether the signal is likely to persist," and shows steps remaining. Result: Opus matched optimal on 25/25 decisions including the one hard decision (t=8, switched ON at Z=+0.35, below greedy threshold of 0.50). The model cited persistence and amortization in its reasoning.
+
+**What this does and does not show:**
+
+The scaffolded result does not demonstrate that the model can plan. The scaffolded prompt eliminated the cognitive steps that define the planning task — it pre-computed options, identified the relevant pattern, and told the model what to reason about. The model followed the scaffold. That is a different capability from constructing the scaffold independently.
+
+The 4.8% to 100% gap on this instance is not progress; it is a measurement of how much work the prompt was doing. A real trader receives raw data with none of this scaffolding. Pre-computing option values, flagging trends, and suggesting persistence reasoning are not available in any deployment context the gym is meant to simulate.
+
+The planning capability is latent in the weak sense that the model can execute a planning procedure when handed step-by-step instructions for it. It is not available in the sense that matters: the model cannot initiate the procedure on its own.
+
+**Design implications for the evaluation prompt:**
+
+The evaluation prompt must be clear about the rules — payoff structure, switching cost, signal coefficient — but must not scaffold the reasoning. Specifically, the prompt must NOT:
+
+- Pre-compute option values for the model
+- Highlight signal trends or run lengths
+- Suggest reasoning about persistence
+- Indicate how many steps remain in a way that frames the amortization calculation
+
+Any of these additions reduces the planning task to instruction-following, which trivializes the gym. The current API evaluation prompt (clear rules, no reasoning scaffold) is the correct level.
+
+The scaffolded prompt can be used for one purpose only: as a behavioral description of what the model should eventually produce spontaneously after RLVR training. The training objective is to internalize the scaffold — to learn, without being told, to compute option values, track signal autocorrelation, and amortize switching costs. But the scaffolded prompt cannot be the evaluation prompt, because it removes the gap the training is intended to close.
+
 ---
 
 ## File Summary

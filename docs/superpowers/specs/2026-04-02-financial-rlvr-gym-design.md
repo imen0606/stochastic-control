@@ -795,6 +795,10 @@ Any of these additions reduces the planning task to instruction-following, which
 
 The scaffolded prompt can be used for one purpose only: as a behavioral description of what the model should eventually produce spontaneously after RLVR training. The training objective is to internalize the scaffold — to learn, without being told, to compute option values, track signal autocorrelation, and amortize switching costs. But the scaffolded prompt cannot be the evaluation prompt, because it removes the gap the training is intended to close.
 
+### 7. Kappa inference — preliminary test inconclusive
+
+A controlled comparison (κ=0.1 vs κ=0.7, same α/λ/T, N=5 per condition, multi-turn API) showed identical model behavior in both conditions (95.9% easy accuracy, 0.4 switches). Only 3 hard decisions total — insufficient for statistical conclusion. The gym is designed to vary all parameters across episodes, but whether models adapt to different signal dynamics through GRPO training remains an untested hypothesis.
+
 ---
 
 ## File Summary

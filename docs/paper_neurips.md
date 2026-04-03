@@ -272,6 +272,14 @@ Manual inspection of Opus transcripts reveals two qualitatively distinct failure
 
 Both failure modes are consistent with the absence of forward-looking reasoning: the model does not plan over the multi-step horizon to amortize costs against persistent gains.
 
+### 6.6 Kappa Inference Test
+
+To test whether Opus adapts to different signal dynamics, we conducted a controlled comparison: two sets of 5 episodes with identical known parameters ($\alpha = 0.30$, $\lambda = 0.15$, $T = 15$) but different unknown mean-reversion speeds ($\kappa = 0.1$ vs.\ $\kappa = 0.7$). The model received the same prompt format in both conditions and could only distinguish the regimes through the observed signal patterns.
+
+Results: Opus exhibited identical behavior in both conditions --- 95.9% easy accuracy and 0.4 mean switches per episode in each. However, only 3 hard decisions occurred across all 10 episodes (2 at $\kappa = 0.1$, 1 at $\kappa = 0.7$), making the test inconclusive for the planning dimension. The behavioral fingerprint (identical switching rate, identical easy accuracy) is consistent with the model applying the same greedy framework regardless of signal dynamics, but the small number of hard decisions prevents a definitive conclusion.
+
+This test was designed to isolate $\kappa$ inference from $\alpha / \lambda$ adaptation (which earlier tests showed the model does correctly). A definitive test would require more instances with parameter configurations that produce more hard decisions.
+
 ---
 
 ## 7. Discussion
@@ -295,6 +303,8 @@ A follow-up manual test complicates the picture without improving it.
 After the API evaluation (Section 6), we conducted two additional tests of Claude Opus 4 on the same gym configuration ($\kappa = 0.1$, $\lambda = 0.15$, $\alpha = 0.30$, $T = 25$):
 
 **Test 1 — API evaluation format (Section 6):** The prompt provides the rules, current signal, current state, and asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 4.8% planning rate on hard decisions ($N = 30$ instances, 125 hard decisions).
+
+**Test 1.5 — Manual minimal-prompt test (seed = 49):** Before the scaffolded test, we conducted a step-by-step manual test using the standard (non-scaffolded) prompt on seed = 49 ($\kappa = 0.1$, $\lambda = 0.15$, $\alpha = 0.30$, $T = 10$). This confirmed the API evaluation findings at the individual level. The model achieved 9/9 on easy decisions (100%) but 0/1 on the single hard decision at $t = 0$. At $t = 0$, the model correctly computed the immediate cost-benefit (expected loss $0.079 < $ switching cost $0.15$) and concluded "not worth switching" --- the greedy answer. It explicitly noted "one mildly negative signal isn't enough evidence of a persistent trend," demonstrating rational uncertainty about signal dynamics. At $t = 1$, after seeing two consecutive negative signals, it inferred "this suggests persistence in the negative direction" and switched OFF --- matching greedy and optimal. The model's reasoning was sophisticated but bounded by its one-step-at-a-time cost-benefit framework.
 
 **Test 2 — Scaffolded prompt (manual test, seed = 47):** The prompt was augmented to pre-compute Option A and Option B with exact numbers, explicitly highlight the trend ("6 consecutive steps trending up"), include the instruction "Consider whether the signal is likely to persist," and display the number of steps remaining. Result: Opus matched the optimal policy on 25 of 25 decisions, including the one hard decision in that episode (at $t = 8$, the model switched ON at $Z = +0.35$, below the greedy threshold of $0.50$). The model's reasoning explicitly cited signal persistence and amortization.
 
@@ -519,3 +529,28 @@ The improved prompt was used for all Opus results reported in this paper. The fa
 
 **Figure K** — Statistical Confidence (CIs and t-tests)
 ![Figure K](../final_plots/statistical_confidence.png)
+
+---
+
+### Appendix F: Complete Test Summary
+
+All tests conducted on Claude Opus 4 (`claude-opus-4-20250514`) or gym infrastructure. Prompt versions: **N/A** = solver/infrastructure (no LLM); **OLD** = broken prompt (no payoff explanation); **IMPROVED** = explicit RULES with payoff structure; **SCAFFOLD** = improved + pre-computed options + trend hints; **IMPROVED\*** = improved but single-turn (future info leaked). Tests marked † were superseded or confounded and are excluded from main results.
+
+| Test # | Description | Prompt Version | Config | N | Key Result | Confidence | Data File |
+|--------|-------------|----------------|--------|---|------------|------------|-----------|
+| 1 | Solver correctness: T=1 reduces to greedy | N/A | κ=0.1, λ=0.15, α=0.30, T=1 | All grid points | Solver reproduces closed-form exactly | High | — |
+| 2 | Goldilocks: easy level | N/A | κ=0.1, λ=0.05, α=0.30, T=10 | N=500 | optimal > greedy > random; greedy capture ~98% | High | — |
+| 3 | Goldilocks: medium level | N/A | κ=0.1, λ=0.15, α=0.30, T=15 | N=500 | optimal > greedy > random; greedy capture ~90% | High | — |
+| 4 | Goldilocks: hard level | N/A | κ=0.1, λ=0.15, α=0.30, T=25 | N=500 | J-capture drops to 40–60%; accuracy stays ~90% | High | — |
+| 5 | Parameter sweep | N/A | 1,500 (κ,λ,α,σz,T) combinations | 1,500 configs | κ dominant; max disagreement ~22%; λ/α peaks at 0.33–0.50 | High | full_parameter_sweep.json |
+| 6 | T=1 accuracy, old prompt | OLD | κ=0.1, λ=0.15, α=0.30, T=1 | Small | ~20% accuracy — prompt comprehension failure | High | — |
+| 7† | Early multi-turn eval, old prompt | OLD | Various | Various | Superseded/confounded — excluded from main results | Low | — |
+| 8† | Sonnet/Haiku eval, old prompt | OLD | Various | Various | Superseded/confounded — excluded from main results | Low | — |
+| 9 | T=1 accuracy, improved prompt | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=1 | Small | ~80% accuracy — prompt fix confirmed | High | — |
+| 10 | Main Opus API eval (30 instances) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=30 (750 decisions) | Easy 77.4%; Hard 4.8% planning rate; 95.2% greedy-like | High | eval_llm_results.json |
+| 11 | Scaffolded manual test (seed=47) | SCAFFOLD | κ=0.1, λ=0.15, α=0.30, T=25 | N=1 (25 decisions) | 25/25 correct incl. 1 hard; scaffold did the planning | Medium | — |
+| 12 | Minimal-prompt manual test (seed=49) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=10 | N=1 (10 decisions) | 9/9 easy (100%); 0/1 hard; greedy reasoning confirmed | Medium | — |
+| 13 | Hard-decision deep-dive (seed=21) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=1 (25 decisions) | 9 hard decisions; model follows greedy throughout | Medium | — |
+| 14† | Single-turn eval (future info leaked) | IMPROVED* | κ=0.1, λ=0.15, α=0.30, T=25 | Various | Superseded/confounded — excluded from main results | Low | — |
+| 15† | Confounded multi-turn variant | IMPROVED* | Various | Various | Superseded/confounded — excluded from main results | Low | — |
+| 16 | Kappa inference test (κ=0.1 vs κ=0.7) | IMPROVED | α=0.30, λ=0.15, T=15; κ varied | N=5 per condition | Identical behavior (95.9% easy, 0.4 switches); only 3 hard decisions — inconclusive | Low | eval_opus_buckets.json |

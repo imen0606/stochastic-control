@@ -8,13 +8,31 @@
 
 ## Background
 
+Existing RLVR gyms (math, code, logic) test **static reasoning with complete information**:
+the model receives a fully specified problem and produces a single answer. No existing gym tests
+**sequential decision-making under uncertainty** — where the agent acts before the full picture
+is revealed and each action constrains future options.
+
+Consider the difference:
+
+- **Math gym:** "The expected return is 0.105 and the cost is 0.15. Should you enter?" → One
+  computation, one answer.
+- **This gym:** "The expected return is 0.105 today and the cost is 0.15, but the signal is
+  persistent. If you enter now, you pay the cost once and earn returns for many future steps.
+  Should you enter?" → Requires reasoning about signal persistence, future switching costs,
+  and trajectory-level consequences.
+
 This gym implements the framework from Bilokon (2026), *"Strategy-Relative Market Regimes as
 Filtration Compressions"*, as a verifiable reinforcement learning environment for RLVR
-post-training of frontier language models.
+post-training of frontier language models. It uses a financial planning domain to test
+sequential reasoning under uncertainty — a capability distinct from static problem-solving
+and untested by existing RLVR gyms.
 
 The key insight: market regimes defined relative to a trading strategy have a computable optimal
 policy (via Bellman backward induction), making them suitable for RLVR where rewards must be
-exactly verifiable.
+exactly verifiable. The gym tests whether models can reason about **when to commit** — not
+just whether an action is immediately profitable, but whether it is worth the cost given how
+long the opportunity is likely to persist.
 
 ---
 

@@ -14,20 +14,32 @@ We introduce the first verifiable reinforcement learning (RLVR) environment for 
 
 ## 1. Introduction
 
-Verifiable reinforcement learning from verifiable rewards (RLVR) has emerged as a powerful paradigm for LLM post-training. DeepSeek-R1 (DeepSeek-AI et al., 2025) demonstrated that GRPO training with verifiable rewards can elicit chain-of-thought reasoning in mathematical problem-solving. Reasoning Gym (Goldie et al., 2025) extended this to a diverse suite of puzzles with computable solutions. These successes share a common requirement: the existence of a deterministic, computable ground truth against which model outputs can be scored.
+Verifiable reinforcement learning from verifiable rewards (RLVR) has emerged as a powerful paradigm for LLM post-training. DeepSeek-R1 (DeepSeek-AI et al., 2025) demonstrated that GRPO training with verifiable rewards can elicit chain-of-thought reasoning in mathematical problem-solving. Reasoning Gym (Stojanovski et al., 2025) extended this to a diverse suite of puzzles with computable solutions. These successes share a common requirement: the existence of a deterministic, computable ground truth against which model outputs can be scored.
 
-Financial planning under uncertainty represents a natural next frontier for RLVR. Multi-step sequential decision-making with switching costs requires exactly the kind of forward-looking reasoning that RLVR aims to train. Unlike single-step classification or static optimization, financial planning demands that agents reason about how present actions affect future option value --- a capability that is distinct from pattern recognition and untested by existing RLVR gyms.
+However, existing RLVR gyms test a specific and narrow type of reasoning: **static problem-solving with complete information**. A math problem presents all its premises at once, and the model produces a single answer. A coding problem presents a specification, and the model produces a single program. There is no unfolding situation, no uncertainty about future inputs, and no cost to changing one's mind.
 
-However, constructing a verifiable gym for financial planning faces a fundamental obstacle: most financial problems lack computable optimal solutions. Portfolio optimization depends on unknown return distributions (Merton, 1969). Optimal execution requires calibrated market impact models (Almgren and Chriss, 2001). Reinforcement learning environments for finance, such as FinRL (Liu et al., 2020), rely on simulation-based evaluation rather than analytic ground truth, making them unsuitable for RLVR.
+Many real-world capabilities require a fundamentally different type of reasoning: **sequential decision-making under uncertainty**, where the agent must act before the full picture is revealed, and where each action constrains or enables future actions. Consider the contrast:
 
-We resolve this by building on Bilokon (2026), who defines strategy-relative market regimes as filtration compressions of the full market information and derives optimal binary regime processes via Bellman dynamic programming. In this framework, an agent observes a scalar signal $Z_t$ that follows a known stochastic process, and must decide at each step whether to be "on" ($s_t = 1$) or "off" ($s_t = 0$), incurring a switching cost $\lambda$ each time the regime changes. Because the signal process is fully specified and the state space is finite (after discretization), the Bellman recursion can be solved exactly via backward induction, providing a computable optimal policy.
+> **Math gym (static):** "A trader pays a fee of \$0.15 to enter or exit a position. The expected daily return is 0.30 times the signal. The signal is +0.35. Should the trader enter?"
+>
+> A single computation: $0.30 \times 0.35 = 0.105 < 0.15$. Answer: no.
+>
+> **Our gym (sequential):** The same trader, same parameters --- but the signal was +0.35 yesterday, is +0.35 today, and will be revealed tomorrow. If the trader enters today, they pay \$0.15 once and earn returns for as long as the signal stays positive. If the signal is persistent (slow mean-reversion), the cumulative returns over many days will exceed the one-time entry cost. The correct answer depends on *how long the signal is likely to persist* --- information that requires reasoning about the dynamics of the process, not just the current snapshot.
+
+This distinction --- reasoning about a single state versus reasoning about a trajectory through states --- is what separates static from sequential planning. Existing RLVR gyms do not test this capability.
+
+Financial planning provides a natural domain for sequential reasoning under uncertainty. A portfolio manager deciding whether to enter a trade must weigh the immediate expected profit against the cost of entry, the probability that the opportunity persists, and the cost of exiting if conditions change. This multi-step, cost-aware reasoning under partial information is precisely the capability we aim to train and evaluate.
+
+**The verification challenge.** Constructing a verifiable gym for sequential financial planning faces a fundamental obstacle: most financial problems lack computable optimal solutions. Portfolio optimization depends on unknown return distributions (Merton, 1969). Optimal execution requires calibrated market impact models (Almgren and Chriss, 2001). Reinforcement learning environments for finance, such as FinRL (Liu et al., 2022), rely on simulation-based evaluation rather than analytic ground truth, making them unsuitable for RLVR.
+
+We resolve this by building on Bilokon (2026), who defines strategy-relative market regimes as filtration compressions of the full market information and derives optimal binary regime processes via Bellman dynamic programming. In this framework, an agent observes a scalar signal $Z_t$ that follows a known stochastic process, and must decide at each step whether to be "on" ($s_t = 1$) or "off" ($s_t = 0$), incurring a switching cost $\lambda$ each time the regime changes. Because the signal process is fully specified and the state space is finite (after discretization), the Bellman recursion can be solved exactly via backward induction, providing a computable optimal policy. The gym thus tests sequential reasoning under uncertainty with a verifiable reward --- a combination that no existing RLVR environment offers.
 
 **Contributions.**
 
-1. We present the first verifiable RLVR environment for financial planning, with exact ground-truth solutions computed via Bellman backward induction.
-2. We characterize the parameter landscape across 1,500 configurations, identifying when and why forward-looking planning differs from greedy behavior.
-3. We introduce a two-bucket evaluation methodology that decomposes LLM performance into comprehension and planning components.
-4. We evaluate a frontier LLM (Claude Opus 4) and find that it follows greedy logic on 95.2% of hard decisions, providing a concrete baseline for future RLVR training.
+1. We present the first verifiable RLVR environment for sequential financial planning, with exact ground-truth solutions computed via Bellman backward induction. Unlike math or code gyms, the environment requires multi-step decisions under uncertainty where actions have path-dependent consequences.
+2. We characterize the parameter landscape across 1,500 configurations, identifying when and why forward-looking planning differs from greedy (myopic) behavior.
+3. We introduce a two-bucket evaluation methodology that decomposes LLM performance into comprehension (can the model evaluate immediate payoffs?) and planning (can the model override locally attractive actions when the future makes them suboptimal?).
+4. We evaluate a frontier LLM (Claude Opus 4) and find that it follows greedy logic on 95.2% of hard decisions, providing a concrete baseline for future RLVR training. The model shows no evidence of sequential planning beyond myopic cost-benefit analysis.
 
 ---
 

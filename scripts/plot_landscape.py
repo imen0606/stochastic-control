@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-with open("docs/parameter_landscape.json") as f:
+with open("docs/data/parameter_landscape.json") as f:
     data = json.load(f)
 
 kappas = sorted(set(r["kappa"] for r in data))

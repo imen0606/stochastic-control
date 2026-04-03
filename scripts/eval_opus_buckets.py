@@ -232,7 +232,7 @@ def main():
         },
         "instances": instance_details,
     }
-    output_path = "docs/eval_opus_buckets.json"
+    output_path = "docs/data/eval_opus_buckets.json"
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2, default=str)
     print(f"\nSaved to {output_path}")

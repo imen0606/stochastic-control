@@ -34,7 +34,12 @@
       "Bash(.venv/bin/python scripts/plot_landscape.py)",
       "Bash(.venv/bin/python scripts/plot_3d_surfaces.py)",
       "Bash(.venv/bin/python scripts/eval_opus_buckets.py)",
-      "Bash(.venv/bin/python:*)"
+      "Bash(.venv/bin/python:*)",
+      "Bash(echo \"FINAL DELIVERABLE\" echo \"=\" * 70 echo \"\" __NEW_LINE_1635502a7c62a17c__ echo \"CODE: 16 Python files\" find financial_gym -name \"*.py\")",
+      "Bash(wc -l __NEW_LINE_1635502a7c62a17c__ echo echo DOCUMENTS: echo '  docs/paper_neurips.md          — NeurIPS paper \\(10 sections + appendix F\\)' echo '  docs/team-memo-financial-rlvr-gym.md — Team memo' echo '  docs/financial-rlvr-gym-slides.pptx  — Presentation \\(needs update with final numbers\\)' echo '  docs/superpowers/specs/2026-04-02-financial-rlvr-gym-design.md — Design spec' __NEW_LINE_1635502a7c62a17c__ echo echo 'FIGURES: 11 plots' ls docs/fig_*.png docs/final_plots/*.png)",
+      "Bash(wc -l __NEW_LINE_1635502a7c62a17c__ echo \"\" echo \"DATA: 6 JSON files \\(reproducibility\\)\" ls docs/*.json)",
+      "Bash(wc -l __NEW_LINE_1635502a7c62a17c__ echo \"\" echo \"SCRIPTS: 5 \\(evaluation, plotting\\)\" ls scripts/*.py)",
+      "Bash(wc -l __NEW_LINE_1635502a7c62a17c__ echo \"\" echo \"GIT LOG \\(recent\\):\" git log --oneline -10)"
     ]
   }
 }

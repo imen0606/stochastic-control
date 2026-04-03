@@ -498,37 +498,37 @@ The improved prompt was used for all Opus results reported in this paper. The fa
 ### Figures
 
 **Figure A** — Where Planning Matters (1,500 configurations)
-![Figure A](../fig_A_where_planning_matters.png)
+![Figure A](../figures/fig_A_where_planning_matters.png)
 
 **Figure B** — Cost of Not Planning (disagreement vs J-capture)
-![Figure B](../fig_B_cost_of_not_planning.png)
+![Figure B](../figures/fig_B_cost_of_not_planning.png)
 
 **Figure C** — The Disagreement Zone (policy comparison at 3 time steps)
-![Figure C](../fig_C_disagreement_zone.png)
+![Figure C](../figures/fig_C_disagreement_zone.png)
 
 **Figure D** — Parameter Sensitivity (which knobs matter most)
-![Figure D](../fig_D_parameter_sensitivity.png)
+![Figure D](../figures/fig_D_parameter_sensitivity.png)
 
 **Figure E** — Full Episode: Opus vs All Agents (seed=8, Opus alternating)
-![Figure E](../fig_F_opus_episode_seed8.png)
+![Figure E](../figures/fig_F_opus_episode_seed8.png)
 
 **Figure F** — Full Episode: 9 Hard Decisions (seed=21)
-![Figure F](../fig_F_opus_episode_seed21.png)
+![Figure F](../figures/fig_F_opus_episode_seed21.png)
 
 **Figure G** — Opus Evaluation Summary (3 panels)
-![Figure G](../fig_G_opus_summary.png)
+![Figure G](../figures/fig_G_opus_summary.png)
 
 **Figure H** — Signal Path Through Threshold Zones
-![Figure H](../fig_H_signal_thresholds.png)
+![Figure H](../figures/fig_H_signal_thresholds.png)
 
 **Figure I** — Reward Distribution (histogram and box plot)
-![Figure I](../final_plots/reward_distribution.png)
+![Figure I](../figures/reward_distribution.png)
 
 **Figure J** — Difficulty Scaling (performance vs parameters)
-![Figure J](../final_plots/difficulty_scaling.png)
+![Figure J](../figures/difficulty_scaling.png)
 
 **Figure K** — Statistical Confidence (CIs and t-tests)
-![Figure K](../final_plots/statistical_confidence.png)
+![Figure K](../figures/statistical_confidence.png)
 
 ---
 

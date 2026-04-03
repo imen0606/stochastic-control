@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm
 
-with open("docs/parameter_landscape.json") as f:
+with open("docs/data/parameter_landscape.json") as f:
     data = json.load(f)
 
 kappas = sorted(set(r["kappa"] for r in data))

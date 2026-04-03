@@ -228,7 +228,7 @@ def main():
     print("=" * 65)
 
     # Save full results
-    output_path = "docs/eval_llm_results.json"
+    output_path = "docs/data/eval_llm_results.json"
     with open(output_path, "w") as f:
         json.dump({
             "config": {

@@ -1,0 +1,237 @@
+[
+  {
+    "seed": 1,
+    "t": 0,
+    "z_t": -0.2401327870008083,
+    "prev_regime": 1,
+    "optimal_action": 0,
+    "greedy_action": 1,
+    "opus_original": 0,
+    "matches_optimal": 10,
+    "matches_greedy": 0,
+    "pass_at_k": true,
+    "margin": 0.0779601638997575,
+    "q_on": -0.07203983610024249,
+    "q_off": -0.15,
+    "cot_samples": [
+      {
+        "text": "I need to decide whether to stay ON (s_t = 1) or switch OFF (s_t = 0).\n\nGiven information:\n- Current state: ON (s_prev = 1)\n- Signal: Z_t = -0.2401\n- Expected PnL if ON: 0.3000 \u00d7 (-0.2401) = -0.0720\n- Expected PnL if OFF: 0\n- Switching cost if I change to OFF: 0.1500\n\nDecision analysis:\n- If I stay ON: I lose 0.0720\n- If I switch OFF: I pay 0.1500 switching cost but avoid the negative PnL\n\nSince the negative PnL (-0.0720) is smaller in magnitude than the switching cost (0.1500), it's better to stay ON and accept the small loss rather than pay the larger switching cost.\n\ns_t = 1",
+        "decision": 0,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "I need to decide whether to stay ON (s_t = 1) or switch OFF (s_t = 0).\n\nGiven information:\n- Current state: ON (s_prev = 1)\n- Signal: Z_t = -0.2401\n- Expected PnL if ON: 0.3000 \u00d7 (-0.2401) = -0.0720\n- Expected PnL if OFF: 0\n- Switching cost if I change to OFF: 0.1500\n\nDecision analysis:\n- If I stay ON: I expect to lose 0.0720\n- If I switch OFF: I pay 0.1500 switching cost but avoid the negative PnL\n\nSince the expected loss from staying ON (-0.0720) is smaller than the switching cost (0.1500), I should stay ON despite the negative signal.\n\ns_t = 1",
+        "decision": 0,
+        "matched_optimal": true,
+        "planning_indicators": 1,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": true
+      },
+      {
+        "text": "I need to decide whether to stay ON (s_t = 1) or switch OFF (s_t = 0).\n\nCurrent state: ON (s_prev = 1)\nSignal: Z_t = -0.2401\n\nAnalysis:\n- If I stay ON (s_t = 1): \n  - PnL = 0.3000 \u00d7 (-0.2401) = -0.0720\n  - No switching cost\n  - Total profit this step = -0.0720\n\n- If I switch OFF (s_t = 0):\n  - PnL = 0\n  - Switching cost = 0.1500\n  - Total profit this step = -0.1500\n\nSince -0.0720 > -0.1500, it's better to stay ON despite the negative signal.\n\nAdditionally, with a switching cost of 0.1500 and signal strength of 0.3000, I should only consider switching when the expected benefit outweighs the cost. The negative signal isn't strong enough to justify paying the switching cost.\n\n**s_t = 1**",
+        "decision": 0,
+        "matched_optimal": true,
+        "planning_indicators": 1,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": true
+      }
+    ]
+  },
+  {
+    "seed": 1,
+    "t": 17,
+    "z_t": 0.23634404400290732,
+    "prev_regime": 0,
+    "optimal_action": 1,
+    "greedy_action": 0,
+    "opus_original": 0,
+    "matches_optimal": 10,
+    "matches_greedy": 0,
+    "pass_at_k": true,
+    "margin": 0.07909678679912781,
+    "q_on": -0.07909678679912781,
+    "q_off": 0.0,
+    "cot_samples": [
+      {
+        "text": "s_17 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_17 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_17 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      }
+    ]
+  },
+  {
+    "seed": 14,
+    "t": 2,
+    "z_t": 0.30875989446724,
+    "prev_regime": 0,
+    "optimal_action": 1,
+    "greedy_action": 0,
+    "opus_original": 0,
+    "matches_optimal": 6,
+    "matches_greedy": 4,
+    "pass_at_k": true,
+    "margin": 0.057372031659828,
+    "q_on": -0.057372031659828,
+    "q_off": 0.0,
+    "cot_samples": [
+      {
+        "text": "s_2 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_2 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_2 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      }
+    ]
+  },
+  {
+    "seed": 18,
+    "t": 2,
+    "z_t": 0.2948701606891635,
+    "prev_regime": 0,
+    "optimal_action": 1,
+    "greedy_action": 0,
+    "opus_original": 0,
+    "matches_optimal": 4,
+    "matches_greedy": 6,
+    "pass_at_k": true,
+    "margin": 0.061538951793250946,
+    "q_on": -0.061538951793250946,
+    "q_off": 0.0,
+    "cot_samples": [
+      {
+        "text": "s_2 = 0",
+        "decision": 0,
+        "matched_optimal": false,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_2 = 0",
+        "decision": 0,
+        "matched_optimal": false,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_2 = 0",
+        "decision": 0,
+        "matched_optimal": false,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      }
+    ]
+  },
+  {
+    "seed": 26,
+    "t": 4,
+    "z_t": 0.32639077304595715,
+    "prev_regime": 0,
+    "optimal_action": 1,
+    "greedy_action": 0,
+    "opus_original": 0,
+    "matches_optimal": 4,
+    "matches_greedy": 6,
+    "pass_at_k": true,
+    "margin": 0.05208276808621286,
+    "q_on": -0.05208276808621286,
+    "q_off": 0.0,
+    "cot_samples": [
+      {
+        "text": "s_4 = 0",
+        "decision": 0,
+        "matched_optimal": false,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_4 = 1",
+        "decision": 1,
+        "matched_optimal": true,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      },
+      {
+        "text": "s_4 = 0",
+        "decision": 0,
+        "matched_optimal": false,
+        "planning_indicators": 0,
+        "has_persistence": false,
+        "has_horizon": false,
+        "has_amortize": false,
+        "has_greedy_override": false
+      }
+    ]
+  }
+]

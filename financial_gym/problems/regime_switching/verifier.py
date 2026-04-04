@@ -26,9 +26,10 @@ def _parse_decision(text: str) -> int:
     ``s_17 = 0``, ``s_{-1} = 1``.
     Returns the *last* match converted to int, or 0 on failure.
     """
-    # Match s followed by optional underscore and optional identifier
-    # (digit, letter 't', or braced expression like {-1})
-    matches = re.findall(r"s(?:_?\{?[\w\-]*\}?)?\s*=\s*([01])\b", text)
+    # Match s with underscore + identifier (s_0, s_t, s_{-1}, s_17)
+    # or standalone s = 0/1
+    # The (?<![a-zA-Z]) lookbehind prevents matching "step", "state", etc.
+    matches = re.findall(r"(?<![a-zA-Z])s(?:_\{?[\w\-]*\}?)?\s*=\s*([01])\b", text)
     if not matches:
         return 0
     return int(matches[-1])

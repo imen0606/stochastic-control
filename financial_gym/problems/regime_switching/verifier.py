@@ -22,10 +22,13 @@ from financial_gym.problems.regime_switching.generator import (
 def _parse_decision(text: str) -> int:
     """Extract the last binary decision from an LLM response.
 
-    Looks for patterns like ``s_0 = 1``, ``s = 0``, ``s3 = 1``.
+    Looks for patterns like ``s_0 = 1``, ``s_t = 0``, ``s = 1``,
+    ``s_17 = 0``, ``s_{-1} = 1``.
     Returns the *last* match converted to int, or 0 on failure.
     """
-    matches = re.findall(r"s_?\d*\s*=\s*([01])\b", text)
+    # Match s followed by optional underscore and optional identifier
+    # (digit, letter 't', or braced expression like {-1})
+    matches = re.findall(r"s(?:_?\{?[\w\-]*\}?)?\s*=\s*([01])\b", text)
     if not matches:
         return 0
     return int(matches[-1])

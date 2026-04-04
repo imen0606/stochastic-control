@@ -8,7 +8,7 @@
 
 ## Abstract
 
-We introduce the first verifiable reinforcement learning (RLVR) environment for financial planning, designed for large language model (LLM) post-training. The environment is grounded in the strategy-relative regime switching framework of Bilokon (2026), where an agent must make binary switching decisions under an observable but noisy signal, subject to switching costs. Bellman backward induction on a discretized state space provides exact optimal policies, enabling mathematically rigorous reward computation. We conduct a parameter landscape analysis across 1,500 configurations, identifying the regions where forward-looking planning diverges from myopic (greedy) behavior. Signal persistence ($\kappa$) emerges as the dominant parameter: slow mean-reversion ($\kappa = 0.1$) yields up to 22% state-level disagreement between optimal and greedy policies, while fast mean-reversion ($\kappa = 0.7$) reduces this to 1.2%. We propose a two-bucket evaluation methodology that separates "easy" decisions (where greedy coincides with optimal) from "hard" decisions (where they diverge), extracting maximal diagnostic information from limited API calls. Evaluating Claude Opus 4 on 30 instances (750 decisions), we find 77.4% accuracy on easy decisions and a 4.8% planning rate on hard decisions --- the model matches greedy behavior on 95.2% of hard decisions, showing no evidence of forward-looking reasoning. The gym is open-source with single-function TRL integration.
+We introduce the first verifiable reinforcement learning (RLVR) environment for financial planning, designed for large language model (LLM) post-training. The environment is grounded in the strategy-relative regime switching framework of Bilokon (2026), where an agent must make binary switching decisions under an observable but noisy signal, subject to switching costs. Bellman backward induction on a discretized state space provides exact optimal policies, enabling mathematically rigorous reward computation. We conduct a parameter landscape analysis across 1,500 configurations, identifying the regions where forward-looking planning diverges from myopic (greedy) behavior. Signal persistence ($\kappa$) emerges as the dominant parameter: slow mean-reversion ($\kappa = 0.1$) yields up to 22% state-level disagreement between optimal and greedy policies, while fast mean-reversion ($\kappa = 0.7$) reduces this to 1.2%. We propose a two-bucket evaluation methodology that separates "easy" decisions (where greedy coincides with optimal) from "hard" decisions (where they diverge), extracting maximal diagnostic information from limited API calls. Evaluating Claude Opus 4 on 30 instances (750 decisions, of which 682 are easy and 68 are hard after correcting a parser bug), we find 99.3% accuracy on easy decisions and a 5.9% planning rate on hard decisions --- the model matches greedy behavior on 94.1% of hard decisions, showing near-zero evidence of forward-looking reasoning. CoT inspection of all saved responses confirms 2/68 (2.9%) genuine planning instances. The gym is open-source with single-function TRL integration.
 
 ---
 
@@ -39,7 +39,7 @@ We resolve this by building on Bilokon (2026), who defines strategy-relative mar
 1. We present the first verifiable RLVR environment for sequential financial planning, with exact ground-truth solutions computed via Bellman backward induction. Unlike math or code gyms, the environment requires multi-step decisions under uncertainty where actions have path-dependent consequences.
 2. We characterize the parameter landscape across 1,500 configurations, identifying when and why forward-looking planning differs from greedy (myopic) behavior.
 3. We introduce a two-bucket evaluation methodology that decomposes LLM performance into comprehension (can the model evaluate immediate payoffs?) and planning (can the model override locally attractive actions when the future makes them suboptimal?).
-4. We evaluate a frontier LLM (Claude Opus 4) and find that it follows greedy logic on 95.2% of hard decisions, providing a concrete baseline for future RLVR training. The model shows no evidence of sequential planning beyond myopic cost-benefit analysis.
+4. We evaluate a frontier LLM (Claude Opus 4) and find near-perfect comprehension (99.3% easy accuracy) but near-zero planning (5.9% hard accuracy, 2.9% confirmed by CoT inspection), providing a concrete baseline for future RLVR training. The comprehension gap previously reported (77.4%) was entirely due to a parser bug and does not reflect genuine model failures; the model shows essentially no evidence of sequential planning beyond myopic cost-benefit analysis.
 
 ---
 
@@ -214,16 +214,18 @@ We evaluate Claude Opus 4 (`claude-opus-4-20250514`) on 30 instances at the conf
 
 ### 6.2 Two-Bucket Methodology
 
-We partition the 750 decisions into two buckets based on the *solver's* policies, not the LLM's:
+We partition decisions into two buckets based on the *solver's* policies, not the LLM's:
 
-- **Easy decisions** ($n = 625$): States where the greedy and optimal policies agree. Any agent that correctly understands the immediate payoff structure should get these right.
-- **Hard decisions** ($n = 125$): States where the greedy and optimal policies disagree --- the disagreement zone. Only a forward-looking agent should match the optimal policy on these.
+- **Easy decisions** ($n = 682$): States where the greedy and optimal policies agree. Any agent that correctly understands the immediate payoff structure should get these right.
+- **Hard decisions** ($n = 68$): States where the greedy and optimal policies disagree --- the disagreement zone. Only a forward-looking agent should match the optimal policy on these.
 
 This partition is computed entirely from the solver, requiring no additional LLM queries. It extracts maximum diagnostic information from limited evaluation budgets by separating two distinct capabilities: comprehension (understanding the problem) and planning (reasoning about the future).
 
+**Note on bucket counts.** The original evaluation reported $n_{\text{easy}} = 625$ and $n_{\text{hard}} = 125$. These figures were produced by a parser that failed to match the `s_t = 1` decision format, causing genuine ON decisions to be misread as 0. The corrected counts ($n_{\text{easy}} = 682$, $n_{\text{hard}} = 68$) reflect the fixed parser; the raw text of all 750 responses is archived for independent verification.
+
 ### 6.3 Temporal Distribution of Hard Decisions
 
-Hard decisions are not concentrated at the beginning of the episode --- they are spread across the full trajectory. Among the 125 hard decisions in the Opus evaluation:
+Hard decisions are not concentrated at the beginning of the episode --- they are spread across the full trajectory. Among the 68 hard decisions in the corrected Opus evaluation:
 
 | Episode phase | Prior signals seen | Share of hard decisions |
 |--------------|-------------------|------------------------|
@@ -233,15 +235,22 @@ Hard decisions are not concentrated at the beginning of the episode --- they are
 
 The average and median hard decision occurs at $t = 11$, meaning the model has already observed approximately 11 prior signal values when it faces a decision that requires forward-looking reasoning.
 
-This is a meaningful quantity of history. With 11 prior observations of an OU process, the agent has sufficient data to form an empirical estimate of signal persistence. Yet Opus still follows greedy logic on 95.2% of hard decisions, including those encountered at mid-episode where the history is abundant.
+This is a meaningful quantity of history. With 11 prior observations of an OU process, the agent has sufficient data to form an empirical estimate of signal persistence. Yet Opus follows greedy logic on 94.1% of hard decisions, including those encountered at mid-episode where the history is abundant.
 
 This rules out a simple information-deficit explanation: the model is not failing because it lacks data about the signal process. The failure persists even when the signal history is rich enough to potentially infer $\kappa$. This suggests a genuine reasoning gap --- the model does not perform the inference from observed signal autocorrelation to future persistence, and even if it did, it does not translate that persistence estimate into a forward-looking switching decision. The gap is in dynamic reasoning, not in information availability.
 
 ### 6.4 Results
 
-**Easy bucket.** Opus correctly matches the optimal (= greedy) policy on 484 of 625 easy decisions, yielding an accuracy of **77.4%**. The 22.6% error rate on easy decisions represents a comprehension gap --- failures of basic signal interpretation or payoff calculation, not planning failures.
+**Easy bucket.** Opus correctly matches the optimal (= greedy) policy on 677 of 682 easy decisions, yielding an accuracy of **99.3%**. The near-perfect easy accuracy confirms that the model understands the immediate payoff structure: the earlier reported 77.4% was entirely an artifact of a parser bug that misread ON decisions as 0 (see Section 8 and Appendix B for details).
 
-**Hard bucket.** Of 125 hard decisions, Opus matches the optimal policy on **6** (4.8%) and matches the greedy policy on **119** (95.2%). Zero decisions match neither. This is the central finding: on decisions where planning matters, Opus behaves almost identically to a greedy agent.
+**Hard bucket.** Of 68 hard decisions, Opus matches the optimal policy on **4** (5.9%) and matches the greedy policy on **64** (94.1%). Zero decisions match neither. This is the central finding: on decisions where planning matters, Opus behaves almost identically to a greedy agent.
+
+**CoT verification.** Manual inspection of the chain-of-thought for all 68 hard decisions found 2 instances of genuine planning (2.9%) and 2 borderline instances (2.9%, near-threshold arithmetic that could be interpreted as planning):
+
+- *Seed 14, t=2* (Z=+0.31, margin=0.057): Model cited "increasing positive momentum", "23 steps remaining", "expected value of switching ON is positive."
+- *Seed 28, t=13* (Z=+0.40, margin=0.031): Model tracked "missed 0.25 in potential profits exceeds switching cost", "12 steps remaining and evidence of strong positive signals."
+
+The remaining 64 hard decisions show no evidence of forward-looking reasoning in the CoT.
 
 **J-value comparison.** Mean cumulative payoff ($J$) across 30 instances:
 
@@ -284,13 +293,13 @@ This test was designed to isolate $\kappa$ inference from $\alpha / \lambda$ ada
 
 ## 7. Discussion
 
-### 7.1 Two Distinct Gaps
+### 7.1 The Single Planning Gap
 
-The two-bucket analysis reveals that Opus's underperformance relative to greedy arises from two independent sources:
+The two-bucket analysis reveals that Opus's underperformance relative to greedy arises from a single source:
 
-1. **Comprehension gap** (23% error on easy decisions): The model sometimes fails to correctly evaluate immediate payoffs, choosing the wrong action even when greedy and optimal agree. This gap was partially addressed by prompt engineering. An earlier prompt yielded only 20% accuracy at $T = 1$ (where optimal = greedy by definition); the improved prompt raised this to 80%. The sensitivity of LLM performance to prompt phrasing is itself an important finding: RLVR gyms must carefully control for prompt clarity to avoid conflating prompt artifacts with reasoning deficits.
+**Planning gap** (94.1% greedy-like on hard decisions): On the 68 decisions where forward-looking reasoning is required, Opus follows greedy logic almost perfectly. There is no evidence that the model spontaneously reasons about future signal persistence or amortizes switching costs over time.
 
-2. **Planning gap** (95% greedy-like on hard decisions): On the 125 decisions where forward-looking reasoning is required, Opus follows greedy logic almost perfectly. There is no evidence that the model reasons about future signal persistence or amortizes switching costs over time.
+**The "comprehension gap" was a parser artifact.** An earlier analysis reported 77.4% easy accuracy (484/625), implying a 22.6% comprehension failure rate. This was entirely caused by a parser bug that failed to match the `s_t = 1` decision format, causing genuine ON decisions to be counted as errors. With the fixed parser, easy accuracy is 99.3% (677/682) — near-perfect. The model correctly evaluates immediate payoffs; the only genuine gap is in dynamic planning. A parser bug that inflated error rates and created a spurious comprehension gap was discovered through manual CoT inspection and corrected (see Section 8 for a full discussion).
 
 ### 7.1.1 Reasoning Quality vs. Reasoning Scope
 
@@ -302,13 +311,13 @@ A follow-up manual test complicates the picture without improving it.
 
 After the API evaluation (Section 6), we conducted two additional tests of Claude Opus 4 on the same gym configuration ($\kappa = 0.1$, $\lambda = 0.15$, $\alpha = 0.30$, $T = 25$):
 
-**Test 1 — API evaluation format (Section 6):** The prompt provides the rules, current signal, current state, and asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 4.8% planning rate on hard decisions ($N = 30$ instances, 125 hard decisions).
+**Test 1 — API evaluation format (Section 6):** The prompt provides the rules, current signal, current state, and asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 5.9% planning rate on hard decisions ($N = 30$ instances, 68 hard decisions after parser correction).
 
 **Test 1.5 — Manual minimal-prompt test (seed = 49):** Before the scaffolded test, we conducted a step-by-step manual test using the standard (non-scaffolded) prompt on seed = 49 ($\kappa = 0.1$, $\lambda = 0.15$, $\alpha = 0.30$, $T = 10$). This confirmed the API evaluation findings at the individual level. The model achieved 9/9 on easy decisions (100%) but 0/1 on the single hard decision at $t = 0$. At $t = 0$, the model correctly computed the immediate cost-benefit (expected loss $0.079 < $ switching cost $0.15$) and concluded "not worth switching" --- the greedy answer. It explicitly noted "one mildly negative signal isn't enough evidence of a persistent trend," demonstrating rational uncertainty about signal dynamics. At $t = 1$, after seeing two consecutive negative signals, it inferred "this suggests persistence in the negative direction" and switched OFF --- matching greedy and optimal. The model's reasoning was sophisticated but bounded by its one-step-at-a-time cost-benefit framework.
 
 **Test 2 — Scaffolded prompt (manual test, seed = 47):** The prompt was augmented to pre-compute Option A and Option B with exact numbers, explicitly highlight the trend ("6 consecutive steps trending up"), include the instruction "Consider whether the signal is likely to persist," and display the number of steps remaining. Result: Opus matched the optimal policy on 25 of 25 decisions, including the one hard decision in that episode (at $t = 8$, the model switched ON at $Z = +0.35$, below the greedy threshold of $0.50$). The model's reasoning explicitly cited signal persistence and amortization.
 
-The 4.8% vs.\ 100% comparison should not be read as evidence that the model can plan when prompted correctly. The scaffolded prompt essentially performed the planning for the model: it pre-computed the arithmetic, identified the pattern the model needed to notice, and directly suggested the reasoning strategy. Passing the scaffolded test is analogous to answering an exam question when the answer sheet is included in the question. The model followed the scaffold; it did not plan independently.
+Importantly, the corrected results change the interpretation of this comparison. Easy accuracy with the standard prompt is already 99.3% --- the scaffold added negligible benefit on easy decisions (the model already comprehended the payoff structure correctly). The entire effect of the scaffold was on the single hard decision: the scaffold performed the forward-looking reasoning the model cannot do spontaneously. The 5.9% vs.\ 100% comparison on hard decisions should not be read as evidence that the model can plan when prompted correctly. The scaffolded prompt essentially performed the planning for the model: it pre-computed the arithmetic, identified the pattern the model needed to notice, and directly suggested the reasoning strategy. Passing the scaffolded test is analogous to answering an exam question when the answer sheet is included in the question. The model followed the scaffold; it did not plan independently.
 
 A real trader receives raw data. Pre-computing option values, flagging signal trends, and explicitly prompting persistence reasoning are not available at inference time in any realistic setting. The scaffolded prompt eliminates the cognitive steps that define the planning task.
 
@@ -322,7 +331,7 @@ For RLVR, this suggests a concrete training objective: internalize the scaffold.
 
 The near-zero planning rate on hard decisions suggests that forward-looking financial reasoning is not an emergent capability of current frontier LLMs, even with careful prompting. This provides a concrete, measurable target for RLVR training. The gym's exact ground truth and regret-normalized scoring make it directly compatible with GRPO and related policy gradient methods.
 
-The two-bucket methodology offers a training diagnostic: monitoring easy-bucket accuracy tracks comprehension improvement, while hard-bucket planning rate tracks the emergence of genuine forward-looking reasoning. An effective RLVR training run should improve both, but the planning rate is the more informative metric.
+The two-bucket methodology offers a training diagnostic: hard-bucket planning rate tracks the emergence of genuine forward-looking reasoning. Easy-bucket accuracy starts near-ceiling (99.3%) and is unlikely to move substantially with RLVR training, since the comprehension capability is already present. The planning rate is the primary metric to monitor.
 
 ### 7.4 Relationship to Existing Work
 
@@ -354,6 +363,8 @@ We aim for full transparency about the current limitations of this work.
 
 **Scores above 1.0.** Because the Bellman solution optimizes expected payoff, individual realized trajectories may yield scores above 1.0 when the LLM happens to benefit from favorable noise. This does not indicate super-optimal planning.
 
+**Parser bug and the spurious comprehension gap.** An initial version of this evaluation used a parser that failed to match the `s_t = 1` decision format (matching `s_t = 0` correctly but over-matching step identifiers and state labels, causing ON decisions to be silently dropped). This inflated the apparent error rate on easy decisions from 0.7% to 22.6%, creating a spurious "comprehension gap." The bug was discovered through manual CoT inspection: the model's reasoning chains clearly stated correct ON decisions, but the parser recorded them as 0. All results in this paper use the corrected parser. The raw text of all 750 responses is saved for independent verification. The lesson: parser correctness must be validated against manually verified ground-truth responses before reporting evaluation results, especially when the parser output is used to draw qualitative conclusions about model capability.
+
 ---
 
 ## 9. Conclusion
@@ -364,7 +375,7 @@ Our parameter landscape analysis across 1,500 configurations fully characterizes
 
 The planning mechanism is transparent and verifiable: the optimal policy is more aggressive than greedy because it amortizes switching costs over persistent future gains. The disagreement zone ($z \in [0.22, 0.50]$ for OFF $\to$ ON switching at our evaluation configuration) can be derived from first principles and verified against the Bellman Q-values.
 
-Evaluating Claude Opus 4, we find that the model significantly outperforms random but significantly underperforms greedy. On the 125 hard decisions where planning matters, Opus matches the greedy policy 95.2% of the time and the optimal policy only 4.8% of the time. Forward-looking financial planning is not an emergent capability of current frontier LLMs.
+Evaluating Claude Opus 4, we find that the model significantly outperforms random but significantly underperforms greedy. The model achieves near-perfect comprehension (99.3% easy accuracy), confirming it correctly understands payoff structure. On the 68 hard decisions where planning matters, Opus matches the greedy policy 94.1% of the time and the optimal policy only 5.9% of the time; CoT inspection confirms genuine planning in only 2/68 decisions (2.9%). There is a single gap: the planning gap. Forward-looking financial planning is not an emergent capability of current frontier LLMs.
 
 The two-bucket evaluation methodology extracts maximum diagnostic information from limited API budgets by separating comprehension from planning. We hope this approach proves useful beyond our specific gym.
 
@@ -454,20 +465,26 @@ All top configurations share $\kappa = 0.1$ (maximum persistence) and $T = 25$ (
 
 ### B. Opus Evaluation: Aggregate Statistics
 
-| Metric | Value |
-|--------|-------|
+All figures use the corrected parser. The buggy-parser figures (Easy 77.4%, Hard 4.8%) are superseded and must not be cited.
+
+| Metric | Value (corrected parser) |
+|--------|--------------------------|
 | Total instances | 30 |
 | Total decisions | 750 |
-| Easy decisions | 625 |
-| Hard decisions | 125 |
-| Easy accuracy | 77.4% (484/625) |
-| Hard: matches optimal | 4.8% (6/125) |
-| Hard: matches greedy | 95.2% (119/125) |
-| Hard: matches neither | 0.0% (0/125) |
+| Easy decisions | 682 |
+| Hard decisions | 68 |
+| Easy accuracy | 99.3% (677/682) |
+| Hard: matches optimal | 5.9% (4/68) |
+| Hard: matches greedy | 94.1% (64/68) |
+| Hard: matches neither | 0.0% (0/68) |
+| CoT-verified genuine planning | 2.9% (2/68) |
+| CoT-verified borderline | 2.9% (2/68) |
 | Mean $J$ (Opus) | $-0.16$ |
 | Mean $J$ (Optimal) | $+1.30$ |
 | Mean $J$ (Greedy) | $+1.19$ |
 | Mean $J$ (Random) | $-1.81$ |
+
+**Parser bug note.** The original evaluation (test 10 in Appendix F) used a parser that over-matched step identifiers and failed to capture `s_t = 1` correctly. This produced Easy 77.4% (484/625) and Hard 4.8% (6/125) — all wrong. Test 17 (corrected parser) supersedes test 10.
 
 ### C. Solver Verification at $T = 1$
 
@@ -547,10 +564,11 @@ All tests conducted on Claude Opus 4 (`claude-opus-4-20250514`) or gym infrastru
 | 7† | Early multi-turn eval, old prompt | OLD | Various | Various | Superseded/confounded — excluded from main results | Low | — |
 | 8† | Sonnet/Haiku eval, old prompt | OLD | Various | Various | Superseded/confounded — excluded from main results | Low | — |
 | 9 | T=1 accuracy, improved prompt | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=1 | Small | ~80% accuracy — prompt fix confirmed | High | — |
-| 10 | Main Opus API eval (30 instances) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=30 (750 decisions) | Easy 77.4%; Hard 4.8% planning rate; 95.2% greedy-like | High | eval_llm_results.json |
+| 10† | Main Opus API eval (30 instances) — SUPERSEDED by test 17 (buggy parser) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=30 (750 decisions) | BUGGY PARSER: Easy 77.4% (484/625); Hard 4.8% (6/125) — all numbers wrong; do not cite | Low | eval_llm_results.json (raw text archived) |
 | 11 | Scaffolded manual test (seed=47) | SCAFFOLD | κ=0.1, λ=0.15, α=0.30, T=25 | N=1 (25 decisions) | 25/25 correct incl. 1 hard; scaffold did the planning | Medium | — |
 | 12 | Minimal-prompt manual test (seed=49) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=10 | N=1 (10 decisions) | 9/9 easy (100%); 0/1 hard; greedy reasoning confirmed | Medium | — |
 | 13 | Hard-decision deep-dive (seed=21) | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=1 (25 decisions) | 9 hard decisions; model follows greedy throughout | Medium | — |
 | 14† | Single-turn eval (future info leaked) | IMPROVED* | κ=0.1, λ=0.15, α=0.30, T=25 | Various | Superseded/confounded — excluded from main results | Low | — |
 | 15† | Confounded multi-turn variant | IMPROVED* | Various | Various | Superseded/confounded — excluded from main results | Low | — |
 | 16 | Kappa inference test (κ=0.1 vs κ=0.7) | IMPROVED | α=0.30, λ=0.15, T=15; κ varied | N=5 per condition | Identical behavior (95.9% easy, 0.4 switches); only 3 hard decisions — inconclusive | Low | eval_opus_buckets.json |
+| 17 | Main Opus API eval — corrected parser | IMPROVED | κ=0.1, λ=0.15, α=0.30, T=25 | N=30 (750 decisions: 682 easy, 68 hard) | Easy 99.3% (677/682); Hard 5.9% (4/68); CoT: 2/68 genuine planning, 2/68 borderline | High | eval_llm_results.json (raw text re-parsed) |

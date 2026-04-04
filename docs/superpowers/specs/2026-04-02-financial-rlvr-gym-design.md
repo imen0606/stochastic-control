@@ -717,9 +717,13 @@ based on decision difficulty:
   These test whether the model does genuine inter-temporal planning.
 
 The two-bucket split revealed that frontier models perform near-ceiling on easy decisions
-(~95%+ accuracy) but show significant variance on hard decisions (~55–75% accuracy).
+(99.3% accuracy, 677/682) and near-floor on hard decisions (5.9% optimal match, 4/68).
 This separation is the key diagnostic: aggregate accuracy conflates easy and hard, obscuring
 whether a model is actually planning or just classifying strong signals.
+
+**Corrected figures (fixed parser):** Easy 99.3% (677/682); Hard 5.9% (4/68); CoT-confirmed
+genuine planning 2.9% (2/68). The earlier figures (Easy 77.4%, Hard 4.8%) were produced by a
+buggy parser and are superseded (see Lesson 8 below).
 
 **Reference:** Figure E shows the easy/hard accuracy split across evaluated models.
 
@@ -770,7 +774,7 @@ Manual testing revealed that the model's failure to plan is partly prompt-depend
 
 **Two tests, same gym, same model:**
 
-- **Test 1 — API evaluation format:** Prompt states the rules, shows the current signal and state, asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 4.8% planning rate on hard decisions (N=30 instances, 125 hard decisions). The model followed greedy logic on 95.2% of hard decisions.
+- **Test 1 — API evaluation format:** Prompt states the rules, shows the current signal and state, asks for a decision. The model must independently compute option values, notice signal trends, and reason about persistence. Result: 5.9% planning rate on hard decisions (N=30 instances, 68 hard decisions after parser correction). The model followed greedy logic on 94.1% of hard decisions.
 
 - **Test 2 — Scaffolded prompt (seed=47, manual test):** Prompt pre-computes Option A and Option B with exact numbers, explicitly notes "6 consecutive steps trending up," includes "Consider whether the signal is likely to persist," and shows steps remaining. Result: Opus matched optimal on 25/25 decisions including the one hard decision (t=8, switched ON at Z=+0.35, below greedy threshold of 0.50). The model cited persistence and amortization in its reasoning.
 
@@ -778,7 +782,7 @@ Manual testing revealed that the model's failure to plan is partly prompt-depend
 
 The scaffolded result does not demonstrate that the model can plan. The scaffolded prompt eliminated the cognitive steps that define the planning task — it pre-computed options, identified the relevant pattern, and told the model what to reason about. The model followed the scaffold. That is a different capability from constructing the scaffold independently.
 
-The 4.8% to 100% gap on this instance is not progress; it is a measurement of how much work the prompt was doing. A real trader receives raw data with none of this scaffolding. Pre-computing option values, flagging trends, and suggesting persistence reasoning are not available in any deployment context the gym is meant to simulate.
+The 5.9% to 100% gap on this instance is not progress; it is a measurement of how much work the prompt was doing. A real trader receives raw data with none of this scaffolding. Pre-computing option values, flagging trends, and suggesting persistence reasoning are not available in any deployment context the gym is meant to simulate.
 
 The planning capability is latent in the weak sense that the model can execute a planning procedure when handed step-by-step instructions for it. It is not available in the sense that matters: the model cannot initiate the procedure on its own.
 
@@ -798,6 +802,37 @@ The scaffolded prompt can be used for one purpose only: as a behavioral descript
 ### 7. Kappa inference — preliminary test inconclusive
 
 A controlled comparison (κ=0.1 vs κ=0.7, same α/λ/T, N=5 per condition, multi-turn API) showed identical model behavior in both conditions (95.9% easy accuracy, 0.4 switches). Only 3 hard decisions total — insufficient for statistical conclusion. The gym is designed to vary all parameters across episodes, but whether models adapt to different signal dynamics through GRPO training remains an untested hypothesis.
+
+### 8. Parser bug: validate the parser before reporting results
+
+**What happened.** The initial evaluation parser correctly matched `s_t = 0` but failed to
+match the `s_t = 1` format. It over-matched step identifiers (`step`, `state`, `switch`) and
+token boundaries, causing genuine ON decisions to be silently dropped and defaulted to 0. The
+result was that the parser reported Easy 77.4% (484/625) and Hard 4.8% (6/125) — figures that
+implied a large "comprehension gap" in which the model was failing on obvious decisions.
+
+**How it was found.** Manual CoT inspection of a sample of "easy errors" showed that the
+model's reasoning was correct — it stated `s_t = 1` in plain text — but the parser had not
+captured it. Re-running with the fixed parser produced Easy 99.3% (677/682) and Hard 5.9%
+(4/68). The comprehension gap disappeared entirely; it had never existed.
+
+**Corrected results (use these):**
+- Easy: 99.3% (677/682)
+- Hard: 5.9% (4/68); greedy: 94.1% (64/68)
+- CoT-verified genuine planning: 2.9% (2/68)
+- CoT-verified borderline: 2.9% (2/68, near-threshold arithmetic)
+- There is ONE gap, not two: the planning gap only
+
+**The two genuine planning instances:**
+- Seed 14, t=2 (Z=+0.31, margin=0.057): Model cited "increasing positive momentum",
+  "23 steps remaining", "expected value of switching ON is positive."
+- Seed 28, t=13 (Z=+0.40, margin=0.031): Model tracked "missed 0.25 in potential profits
+  exceeds switching cost", "12 steps remaining and evidence of strong positive signals."
+
+**Design implication.** All future evaluations must include a parser validation step:
+run the parser against a manually labeled sample of 10–20 responses and verify zero
+false negatives before reporting aggregate results. The raw text of all API responses must
+be archived so that parser bugs can be corrected without re-running costly evaluations.
 
 ---
 

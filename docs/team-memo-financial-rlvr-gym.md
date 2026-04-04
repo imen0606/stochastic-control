@@ -290,11 +290,21 @@ opportunity has passed.
 Two-bucket analysis across a batch of decisions (e.g. 750 per evaluation run): classify
 each decision as **easy** (greedy = optimal, the correct answer is obvious from the current
 signal) or **hard** (greedy ≠ optimal, forward-looking planning is required). Easy accuracy
-measures basic comprehension — can the model read a signal and apply the payoff formula?
+confirms basic comprehension — can the model read a signal and apply the payoff formula?
 Hard accuracy measures planning capability — can the model override a locally attractive
 action because the future makes it suboptimal? This separation extracts maximum information
-from limited API calls: a model that scores 95% easy / 55% hard is qualitatively different
-from one that scores 80% easy / 80% hard.
+from limited API calls.
+
+**Baseline results (Claude Opus 4, corrected parser):** Easy 99.3% (677/682) — near-perfect
+comprehension. Hard 5.9% (4/68) — near-zero planning. CoT inspection confirms genuine
+planning in only 2/68 decisions (2.9%). There is a single capability gap: the planning gap.
+The comprehension gap is not a real phenomenon — the model correctly evaluates immediate
+payoffs; it simply cannot perform forward-looking planning without explicit scaffolding.
+
+**Note on parser correctness:** An earlier version of this evaluation reported Easy 77.4% and
+Hard 4.8% due to a parser bug that failed to capture `s_t = 1` decisions. Those numbers are
+wrong and superseded. All archived raw response text was re-parsed with the fixed parser to
+produce the corrected figures above.
 
 ---
 

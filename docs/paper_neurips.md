@@ -1,8 +1,8 @@
 # Strategy-Relative Regime Switching as a Verifiable RLVR Environment for Financial Planning
 
-**Anonymous Authors**
+**Imen Ayadi**
 
-*Submitted to NeurIPS 2026*
+*Draft (Preliminary) — April 2026*
 
 ---
 
@@ -258,7 +258,7 @@ The remaining 64 hard decisions show no evidence of forward-looking reasoning in
 |-------|----------|
 | Optimal (Bellman) | +1.30 |
 | Greedy | +1.19 |
-| Opus | $-0.16$ |
+| Opus | $+1.17$ |
 | Random | $-1.81$ |
 
 **Statistical tests** (two-sample $t$-tests, $N = 30$):
@@ -266,10 +266,10 @@ The remaining 64 hard decisions show no evidence of forward-looking reasoning in
 | Comparison | $p$-value | Conclusion |
 |------------|-----------|------------|
 | Opus vs. Random | $< 0.0001$ | Opus $>$ Random |
-| Opus vs. Greedy | $= 0.0001$ | Opus $<$ Greedy |
+| Opus vs. Greedy | $= 0.97$ | Not significant |
 | Greedy vs. Optimal | $= 0.82$ | Not significant |
 
-Opus significantly outperforms random but significantly underperforms greedy. The Greedy vs. Optimal comparison is not significant at $N = 30$; this is expected given the small per-instance $J$ difference ($+1.19$ vs. $+1.30$) and is confirmed by separate Goldilocks analysis at $N = 500$ instances.
+Opus significantly outperforms random but is statistically indistinguishable from greedy ($p = 0.97$). This is consistent with the 96.5% decision overlap: Opus makes the same decisions as greedy on almost every step, so their aggregate profits are nearly identical. The Greedy vs. Optimal comparison is also not significant ($p = 0.82$) at $N = 30$. The two-bucket per-decision analysis ($n = 750$) provides the statistical power that aggregate $J$ comparison lacks.
 
 ### 6.5 Failure Modes
 
@@ -375,7 +375,7 @@ Our parameter landscape analysis across 1,500 configurations fully characterizes
 
 The planning mechanism is transparent and verifiable: the optimal policy is more aggressive than greedy because it amortizes switching costs over persistent future gains. The disagreement zone ($z \in [0.22, 0.50]$ for OFF $\to$ ON switching at our evaluation configuration) can be derived from first principles and verified against the Bellman Q-values.
 
-Evaluating Claude Opus 4, we find that the model significantly outperforms random but significantly underperforms greedy. The model achieves near-perfect comprehension (99.3% easy accuracy), confirming it correctly understands payoff structure. On the 68 hard decisions where planning matters, Opus matches the greedy policy 94.1% of the time and the optimal policy only 5.9% of the time; CoT inspection confirms genuine planning in only 2/68 decisions (2.9%). There is a single gap: the planning gap. Forward-looking financial planning is not an emergent capability of current frontier LLMs.
+Evaluating Claude Opus 4, we find the model is statistically indistinguishable from greedy on aggregate profit ($\rho = 0.996$, $p = 0.97$, 96.5% decision overlap). The model achieves near-perfect comprehension (99.3% easy accuracy), confirming it correctly understands payoff structure. On the 68 hard decisions where planning matters, Opus matches the greedy policy 94.1% of the time and the optimal policy only 5.9% of the time; CoT inspection confirms genuine planning in only 2/68 decisions (2.9%). There is a single gap: the planning gap. Forward-looking financial planning is not an emergent capability of current frontier LLMs.
 
 The two-bucket evaluation methodology extracts maximum diagnostic information from limited API budgets by separating comprehension from planning. We hope this approach proves useful beyond our specific gym.
 
@@ -479,7 +479,7 @@ All figures use the corrected parser. The buggy-parser figures (Easy 77.4%, Hard
 | Hard: matches neither | 0.0% (0/68) |
 | CoT-verified genuine planning | 2.9% (2/68) |
 | CoT-verified borderline | 2.9% (2/68) |
-| Mean $J$ (Opus) | $-0.16$ |
+| Mean $J$ (Opus) | $+1.17$ |
 | Mean $J$ (Optimal) | $+1.30$ |
 | Mean $J$ (Greedy) | $+1.19$ |
 | Mean $J$ (Random) | $-1.81$ |

@@ -81,18 +81,33 @@ All processes fit the Bellman framework; only the transition kernel and integrat
 
 ## 4. Parameter Landscape Analysis
 
-Full factorial sweep: $5\kappa \times 5\lambda \times 5\alpha \times 3\sigma_z \times 4T = 1{,}500$ configurations, each solved exactly. The **solver-based disagreement metric** measures the fraction of states where optimal and greedy policies differ, weighted by the OU stationary distribution.
+### 4.1 Purpose
 
-**Key findings:**
+The sweep answers a practical question for any lab adopting the gym: at which parameter settings does the gym actually test planning, and at which is it trivially solved by a greedy heuristic? Without this characterisation, a lab risks wasting compute on episodes where the optimal and greedy policies agree — producing no training signal for planning.
 
-| Parameter | Effect |
-|-----------|--------|
-| $\kappa$ (persistence) | **Dominant.** $\kappa=0.1$: 13.1% avg disagreement. $\kappa=0.7$: 1.2%. |
-| $\lambda/\alpha$ ratio | Non-monotone, peaks at 0.33–0.50. |
-| $T$ (horizon) | Moderate amplifier. |
-| $\sigma_z$, $\alpha$ | Small individual effects. |
+### 4.2 Method
 
-Maximum disagreement: ~22% of states on the grid, ~10% on actual trajectories (the difference arises because the stationary distribution concentrates probability away from the disagreement zone). See Figure A.
+Full factorial sweep: $5\kappa \times 5\lambda \times 5\alpha \times 3\sigma_z \times 4T = 1{,}500$ configurations, each solved exactly. The **solver-based disagreement metric** measures the fraction of $(z, s^-)$ states where the Bellman optimal policy differs from the greedy (myopic) policy, weighted by the OU stationary distribution. This is computed entirely from the solver — no LLM involved, no simulation noise.
+
+### 4.3 Key findings
+
+**Signal persistence ($\kappa$) is the dominant parameter.** $\kappa$ alone explains 46% of the variance in disagreement ($R^2 = 0.456$). At $\kappa = 0.1$ (slow reversion, persistent signals), the average disagreement across all other parameters is 13.1%. At $\kappa = 0.7$ (fast reversion), it drops to 1.2%. $\kappa$ determines the one-step autocorrelation of the signal: $\text{Corr}(Z_t, Z_{t+1}) = e^{-\kappa}$. At $\kappa = 0.1$, the autocorrelation is 0.90 — today's signal strongly predicts tomorrow's, making forward-looking reasoning valuable. At $\kappa = 0.7$, it drops to 0.50 — the signal is nearly unpredictable one step ahead, and greedy is near-optimal.$^1$
+
+**$\kappa$ dominates over the combined $\kappa \times T$ interaction.** One might expect the relevant quantity to be the number of reversion half-lives in the episode ($\kappa T / \ln 2$), since a slow-reverting signal over a short horizon differs from the same signal over a long horizon. However, $\kappa$ alone ($R^2 = 0.456$) is a substantially better predictor of disagreement than $\kappa \times T$ ($R^2 = 0.178$). The planning advantage comes from per-step persistence, not from how many reversion cycles fit in the episode.
+
+**The $\lambda / \alpha$ ratio has a non-monotone effect.** Disagreement peaks at $\lambda / \alpha \in [0.33, 0.50]$ and falls at both extremes. When switching is very cheap, both policies switch freely and agree. When switching is very expensive, neither switches and they agree. The planning gap is widest at intermediate switching costs.
+
+**$T$, $\sigma_z$, and $\alpha$ individually have small effects.** Longer horizons moderately amplify disagreement. Signal noise and signal strength matter primarily through their ratio $\lambda / \alpha$.
+
+**Maximum disagreement ceiling.** The highest observed disagreement is ~22% of states on the grid. On actual simulated trajectories, ~10% of visited decisions differ — the gap arises because the OU stationary distribution concentrates probability away from the disagreement zone. See Figure A.
+
+### 4.4 Implications for episode construction
+
+The sweep identifies the **planning zone**: the parameter region where the gym produces meaningful training signal. Episodes drawn from outside this zone (high $\kappa$, extreme $\lambda/\alpha$) test comprehension — which models already ace — but not planning. For evaluation and training, we recommend $\kappa \in [0.1, 0.25]$ and $\lambda / \alpha \in [0.3, 0.5]$, with $T$, $\sigma_z$, $\alpha$, $\lambda$ individually varying freely from defaults. This is analogous to a reasoning gym excluding trivial arithmetic: episodes where greedy equals optimal do not test planning and should not dominate the training distribution.
+
+---
+
+$^1$ *Why $\kappa$ alone, not $\kappa \times T$:* $\kappa$ measures per-step signal persistence — how much knowing $Z_t$ tells you about $Z_{t+1}$. The optimal threshold shifts from greedy's threshold because the continuation value says "being ON now is worth more than the immediate PnL, because you will also earn next step without paying switching cost again." This shift depends on how much the signal persists to the next step — which is $\kappa$, not $T$. $T$ determines how many steps exhibit this shift, but the size of the shift at each non-terminal step is roughly constant (set by $\kappa$). Averaging over more steps with the same per-step disagreement does not change the average. The only exception is near the terminal step, where the disagreement zone shrinks (no future = no planning); longer $T$ means fewer terminal steps as a fraction of total, producing slightly higher average disagreement. This explains the moderate $T$ effect observed in the sweep.
 
 ---
 

@@ -24,6 +24,10 @@ No gym tests **sequential decision-making under uncertainty** — where the agen
 
 Financial planning faces a verification obstacle: real markets have unknown distributions, making optimal solutions uncomputable. We bypass this using the Ornstein-Uhlenbeck (OU) process for the signal. The OU process provides three properties simultaneously: (1) financially meaningful mean-reversion dynamics, empirically documented in pairs trading spreads, volatility, and interest rates (Vasicek, 1977; Gatev et al., 2006); (2) Gaussian transitions enabling exact Bellman solutions via Gauss-Hermite quadrature; (3) bounded stationary distribution ensuring numerical stability. No other common financial process provides all three.
 
+The PnL function $X_{t+1} = \alpha \cdot Z_t + \sigma_x \epsilon$ is strategy-agnostic: the signal $Z_t$ can represent any observable quantity driving a strategy's profitability — a pairs trading spread, a volatility measure, an interest rate differential, a momentum indicator. The parameter $\alpha$ scales signal units into PnL. The regime question (ON or OFF) is strategy-relative: the same signal may be favorable for one strategy and unfavorable for another.
+
+We chose OU as the signal process because mean-reversion is the most documented signal dynamic in quantitative finance, and OU is the simplest Gaussian mean-reverting process. The Gaussian property is what enables exact Bellman solutions — other mean-reverting processes (CIR, exponential OU, jump-diffusion with reversion) lack Gaussian transitions and would require approximate numerical methods. RLVR requires exact ground truth; approximate solutions introduce noise into the reward signal, undermining the verifiability that distinguishes RLVR from standard RL. We restrict to OU precisely because it is the process for which the Bellman optimal is provably exact, not merely estimated.
+
 We build on Bilokon (2026), who defines strategy-relative market regimes as filtration compressions and proves existence/uniqueness of optimal binary regime processes under Markov structure.
 
 **Contributions.**
@@ -46,6 +50,20 @@ where $s_t = 1$ means the strategy is active (collect PnL), $s_t = 0$ means inac
 The signal follows an OU process: $Z_{t+1} = Z_t + \kappa(\theta - Z_t) + \sigma_z \epsilon_t$, with PnL $X_{t+1} | Z_t \sim \mathcal{N}(\alpha Z_t, \sigma_x^2)$. The Bellman recursion is solved exactly via backward induction on a discretised $z$-grid with Gauss-Hermite quadrature for the Gaussian transition integral.
 
 Each episode samples different parameters $(\kappa, \lambda, \alpha, \sigma_z, T)$ from configured ranges. The model knows $\alpha$, $\lambda$, $T$ (given in the prompt) but not $\kappa$ or $\sigma_z$ (must infer from observations). The Bellman solver knows all parameters — creating an information asymmetry discussed in Section 6.
+
+### 2.2 Scope
+
+The OU signal process covers strategies on mean-reverting signals. Strategies on non-mean-reverting signals require different processes:
+
+| Signal type | Example strategy | Process | OU applicable? |
+|---|---|---|---|
+| Mean-reverting spread | Pairs trading, stat-arb | OU | Yes |
+| Mean-reverting volatility | Volatility trading | OU | Yes |
+| Interest rate differential | Carry trade | OU | Yes |
+| Trending price | Trend following | GBM | No — requires extension |
+| Range-bound with breakouts | Breakout trading | Jump-diffusion | No — requires extension |
+
+All processes fit the Bellman framework; only the transition kernel and integration method change. Extensions to non-Gaussian processes would use Monte Carlo integration, introducing approximation into the ground truth — acceptable for training but less suitable for strict RLVR verification.
 
 ---
 

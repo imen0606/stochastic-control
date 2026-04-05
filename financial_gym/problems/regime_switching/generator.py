@@ -70,12 +70,22 @@ class RegimeSwitchingProblem(BaseProblem):
 
 @dataclass
 class GeneratorConfig:
+    """Configuration for the regime switching generator.
+
+    Parameters are sampled uniformly from their ranges. Two modes for
+    setting the switching cost:
+      - lam_range: sample lambda independently (default)
+      - lam_alpha_ratio_range: sample lambda/alpha ratio, then compute
+        lambda = alpha * ratio. Ensures the ratio stays in a controlled
+        range. If set, lam_range is ignored.
+    """
     kappa_range: tuple[float, float] = (0.1, 0.5)
     theta: float = 0.0
     sigma_z_range: tuple[float, float] = (0.1, 0.3)
     alpha_range: tuple[float, float] = (0.1, 0.5)
     sigma_x_range: tuple[float, float] = (0.1, 0.3)
     lam_range: tuple[float, float] = (0.0, 0.3)
+    lam_alpha_ratio_range: tuple[float, float] | None = None
     T_range: tuple[int, int] = (3, 20)
     utility: Literal["linear", "exponential"] = "linear"
     gamma: float = 1.0
@@ -88,6 +98,39 @@ class GeneratorConfig:
                 f"alpha_min must be >= 0.1 to prevent degenerate instances, "
                 f"got alpha_range[0]={self.alpha_range[0]}"
             )
+
+    @classmethod
+    def planning_zone(cls) -> "GeneratorConfig":
+        """Config targeting the planning zone identified by the parameter sweep.
+
+        kappa in [0.1, 0.25] (persistent signals where planning matters),
+        lambda/alpha ratio in [0.3, 0.5] (intermediate switching costs),
+        other parameters vary freely from defaults.
+        """
+        return cls(
+            kappa_range=(0.1, 0.25),
+            alpha_range=(0.1, 0.5),
+            lam_alpha_ratio_range=(0.3, 0.5),
+            sigma_z_range=(0.1, 0.3),
+            sigma_x_range=(0.1, 0.3),
+            T_range=(5, 20),
+        )
+
+    @classmethod
+    def control_zone(cls) -> "GeneratorConfig":
+        """Config for the control zone where greedy ≈ optimal.
+
+        kappa = 0.7 (fast reversion, greedy is near-optimal).
+        Same other parameter ranges as planning_zone for fair comparison.
+        """
+        return cls(
+            kappa_range=(0.7, 0.7),
+            alpha_range=(0.1, 0.5),
+            lam_alpha_ratio_range=(0.3, 0.5),
+            sigma_z_range=(0.1, 0.3),
+            sigma_x_range=(0.1, 0.3),
+            T_range=(5, 20),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +222,11 @@ class RegimeSwitchingGenerator(BaseGenerator):
         sigma_z = float(rng.uniform(*cfg.sigma_z_range))
         alpha = float(rng.uniform(*cfg.alpha_range))
         sigma_x = float(rng.uniform(*cfg.sigma_x_range))
-        lam = float(rng.uniform(*cfg.lam_range))
+        if cfg.lam_alpha_ratio_range is not None:
+            ratio = float(rng.uniform(*cfg.lam_alpha_ratio_range))
+            lam = alpha * ratio
+        else:
+            lam = float(rng.uniform(*cfg.lam_range))
         T = int(rng.integers(cfg.T_range[0], cfg.T_range[1] + 1))
         initial_regime = int(rng.integers(0, 2))
 

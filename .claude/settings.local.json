@@ -42,7 +42,8 @@
       "Bash(wc -l __NEW_LINE_1635502a7c62a17c__ echo \"\" echo \"GIT LOG \\(recent\\):\" git log --oneline -10)",
       "Bash(grep -v grep echo --- tail -15 docs/data/eval_run_log.txt 2)",
       "Bash(/dev/null echo:*)",
-      "Bash(xargs -I{} echo \"Processes running: {}\")"
+      "Bash(xargs -I{} echo \"Processes running: {}\")",
+      "Bash(xargs -I{} echo \"Processes still running: {}\")"
     ]
   }
 }

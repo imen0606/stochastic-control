@@ -93,7 +93,7 @@ Every optimal match had planning reasoning in the CoT — zero lucky guesses. Al
 
 **Implications for RLVR.** RLVR training would provide gradient pushing the model to attend to signal history, estimate persistence, and override immediate cost-benefit when amortisation justifies it. The 9 instances prove this reasoning exists in the model's distribution.
 
-**Limitations.** Single problem type (binary switching on scalar OU). Information asymmetry (solver knows $\kappa$, model does not). Small hard-decision counts per condition (11--23). No training results. Stationary process.
+**Limitations.** The gym implements a single problem type (binary switching on a scalar OU signal), though the binary action space is theoretically justified and the framework extends to other PnL functions and signal processes by changing only the payoff mapping and transition kernel. Hard-decision counts per condition are small (11--23), producing wide confidence intervals on planning rates. RLVR training has not been conducted, though the 20% genuine planning rate suggests sufficient correct reasoning paths for GRPO without cold-start SFT.
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## Abstract
 
-We introduce the first verifiable reinforcement learning with verifiable rewards (RLVR) environment for financial planning, designed for large language model (LLM) post-training. The environment is grounded in the strategy-relative regime switching framework of Bilokon (2026), where an agent makes binary switching decisions under an observable mean-reverting signal, subject to switching costs. We use the Ornstein-Uhlenbeck process to model signal dynamics, exploiting its Gaussian transition density for exact Bellman solutions via Gauss-Hermite quadrature — bypassing the fundamental obstacle that prevents RLVR in real financial markets (unknown distributions). A parameter landscape analysis across 1,500 configurations identifies signal persistence ($\kappa$) as the dominant factor determining when forward-looking planning diverges from myopic behavior (up to 22% of states). We propose a two-bucket evaluation methodology separating comprehension from planning, and evaluate Claude Opus 4 across 4 conditions (2 parameter zones $\times$ 2 prompt types, $N=30$ each, varied parameters per episode). The model achieves 97--99% accuracy on easy decisions (comprehension) across all conditions. CoT-verified genuine planning occurs on 20% of hard decisions in the planning zone ($\kappa \in [0.1, 0.25]$) but only 4% in the control zone ($\kappa = 0.7$), consistent with planning being less valuable at fast reversion. A context prompt providing qualitative strategy knowledge shows negligible effect. The gym is open-source with single-function TRL integration.
+We introduce the first verifiable reinforcement learning with verifiable rewards (RLVR) environment for financial planning, designed for large language model (LLM) post-training. The environment is grounded in the strategy-relative regime switching framework of Bilokon (2026), where an agent makes binary switching decisions under an observable mean-reverting signal, subject to switching costs. We use the Ornstein-Uhlenbeck process to model signal dynamics, exploiting its Gaussian transition density for exact Bellman solutions via Gauss-Hermite quadrature — bypassing the fundamental obstacle that prevents RLVR in real financial markets (unknown distributions). A parameter landscape analysis across 1,500 configurations identifies signal persistence ($\kappa$) as the dominant factor determining when forward-looking planning diverges from myopic behavior (up to 22% of states). We propose a two-bucket evaluation methodology separating comprehension from planning, and evaluate Claude Opus 4 across 4 conditions (2 parameter zones $\times$ 2 prompt types, $N=30$ each, varied parameters per episode). The model achieves 97--99% accuracy on easy decisions (comprehension) across all conditions. CoT-verified genuine planning occurs on 20% of hard decisions in the planning zone ($\kappa \in [0.1, 0.25]$) but only 4% in the fast-reversion zone ($\kappa = 0.7$), consistent with planning being less valuable at fast reversion. A context prompt providing qualitative strategy knowledge shows negligible effect. The gym is open-source with single-function TRL integration.
 
 ---
 
@@ -35,7 +35,7 @@ We build on Bilokon (2026), who synthesises ideas from regime switching (Hamilto
 1. First verifiable RLVR environment for sequential financial planning with exact Bellman solutions.
 2. Parameter landscape characterisation across 1,500 configurations identifying when planning matters.
 3. Two-bucket evaluation methodology decomposing comprehension from planning.
-4. Four-condition evaluation (2 zones $\times$ 2 prompts) showing 20% CoT-verified planning in the planning zone, 4% in the control zone, with negligible prompt effect.
+4. Four-condition evaluation (2 zones $\times$ 2 prompts) showing 20% CoT-verified planning in the planning zone, 4% in the fast-reversion zone, with negligible prompt effect.
 
 ---
 
@@ -121,7 +121,7 @@ The greedy agent switches ON when immediate gain exceeds switching cost: $\alpha
 
 ### 6.1 Setup
 
-Claude Opus 4 evaluated across 4 conditions: 2 parameter zones (planning zone $\kappa \in [0.1, 0.25]$; control zone $\kappa = 0.7$) $\times$ 2 prompt types (original; context prompt adding "you are managing a mean-reversion strategy"). $N=30$ episodes per condition, with parameters varied per episode. Multi-turn protocol (one API call per time step). All results use the corrected parser; raw text of all responses is archived.
+Claude Opus 4 evaluated across 4 conditions: 2 parameter zones (planning zone $\kappa \in [0.1, 0.25]$; fast-reversion zone $\kappa = 0.7$) $\times$ 2 prompt types (original; context prompt adding "you are managing a mean-reversion strategy"). $N=30$ episodes per condition, with parameters varied per episode. Multi-turn protocol (one API call per time step). All results use the corrected parser; raw text of all responses is archived.
 
 ### 6.2 Results by Condition
 
@@ -129,24 +129,22 @@ Claude Opus 4 evaluated across 4 conditions: 2 parameter zones (planning zone $\
 |-----------|----------|--------|--------|----------------|-----------------|
 | Planning zone | 0.1--0.25 | Original | 97.1% | 23 | 26.1% (6/23) |
 | Planning zone | 0.1--0.25 | Context | 97.7% | 17 | 29.4% (5/17) |
-| Control zone | 0.7 | Original | 98.9% | 12 | 25.0% (3/12) |
-| Control zone | 0.7 | Context | 98.0% | 11 | 18.2% (2/11) |
+| Fast-reversion zone | 0.7 | Original | 98.9% | 12 | 25.0% (3/12) |
+| Fast-reversion zone | 0.7 | Context | 98.0% | 11 | 18.2% (2/11) |
 
-Easy accuracy is 97--99% across all 4 conditions — comprehension is robust and insensitive to both $\kappa$ and prompt type. The context prompt ("you are managing a mean-reversion strategy") has negligible effect on planning rates (26% vs 29% in planning zone, within noise). Qualitative strategy knowledge does not unlock planning.
+Consistent with the sweep, the planning zone produces more hard decisions (40 across both prompts) than the fast-reversion zone (23) — the model and greedy agree more often when signals revert quickly. Easy accuracy is 97--99% across all conditions. The context prompt has negligible effect (26% vs 29% in the planning zone, within noise).
 
 ### 6.3 CoT-Verified Planning
 
-Manual inspection of all 63 hard decisions from saved raw text, with CoT verification:
+The raw match rates in Table 1 appear similar across zones (~25%). However, this is misleading: at $\kappa = 0.7$, the few hard decisions that exist have tiny greedy-optimal margins (0.002--0.008), meaning the model's imprecise arithmetic can accidentally land on either side. Manual CoT inspection of all 63 hard decisions separates genuine planning from borderline arithmetic:
 
-| Zone | Hard decisions | Matched optimal | Genuine planning | Genuine rate |
-|------|----------------|-----------------|------------------|--------------|
-| Planning ($\kappa = 0.1$--$0.25$) | 40 | 11 | 8 | 20.0% |
-| Control ($\kappa = 0.7$) | 23 | 5 | 1 | 4.3% |
-| **Total** | **63** | **16** | **9** | **14.3%** |
+| Zone | Hard decisions | Matched optimal | Genuine | Borderline | Genuine rate |
+|------|----------------|-----------------|---------|------------|--------------|
+| Planning ($\kappa = 0.1$--$0.25$) | 40 | 11 | 8 | 3 | 20.0% |
+| Fast-reversion ($\kappa = 0.7$) | 23 | 5 | 1 | 4 | 4.3% |
+| **Total** | **63** | **16** | **9** | **7** | **14.3%** |
 
-Every optimal match had at least some planning reasoning in the CoT — zero lucky guesses. The 9 genuine planning instances show: trend recognition, horizon counting, amortisation logic, and greedy override.
-
-In the planning zone, the model genuinely plans on 20% of hard decisions. In the control zone, this drops to 4% — consistent with planning being less valuable when the signal reverts quickly ($\kappa = 0.7$, one-step autocorrelation 0.50).
+The planning zone has 5$\times$ more genuine planning than the fast-reversion zone (20% vs 4%), consistent with the sweep's prediction that $\kappa$ drives the planning advantage. The raw match rates look similar because borderline matches inflate the fast-reversion numbers — at high $\kappa$, most "matches" are near-threshold arithmetic, not forward-looking reasoning. All 9 genuine instances show: trend recognition, horizon counting, amortisation logic, and greedy override.
 
 Representative genuine planning instances:
 
@@ -155,9 +153,9 @@ Representative genuine planning instances:
 
 These two instances from the original fixed-$\kappa$ eval are now supplemented by 7 more across the varied conditions, all showing the same pattern: the model recognises signal trend, counts remaining horizon, reasons about amortisation of switching cost, and overrides the greedy decision. The model plans like a trader when it plans.
 
-### 6.4 Information Asymmetry and the Control Zone
+### 6.4 Sensitivity to Signal Dynamics
 
-The optimal policy knows $\kappa$; the model does not. However, hard decisions occur at median $t=11$, where the model has observed ~11 signals — sufficient data to potentially estimate signal persistence. The control zone ($\kappa = 0.7$) directly tests whether the model's planning behavior responds to signal dynamics: genuine planning drops to 4% (1/23 hard decisions), down from 20% (8/40) in the planning zone. This is consistent with the solver's disagreement rate ($\kappa = 0.7$: 1.2% vs $\kappa = 0.1$: 13.1%). The model plans less when planning is less valuable, suggesting some sensitivity to signal dynamics even without explicit $\kappa$ knowledge.
+The model does not know $\kappa$, yet its behavior differs across zones: genuine planning drops from 20% (planning zone) to 4% (fast-reversion zone), and hard decisions drop from 40 to 23. Both are consistent with the sweep's prediction that planning matters less at high $\kappa$. The model appears sensitive to signal dynamics — planning more when signals persist and less when they revert quickly — even without explicit $\kappa$ knowledge.
 
 ---
 
@@ -179,7 +177,7 @@ The optimal policy knows $\kappa$; the model does not. However, hard decisions o
 
 **Single problem type.** Binary switching on a scalar OU signal. The binary action space is theoretically justified (Bilokon 2026 proves one bit suffices), and the scope table (Section 2.2) documents what OU covers and what requires extension. Different PnL functions (mean-reversion profit, momentum, magnitude) would test different temporal reasoning sub-skills within the same framework — planned but not yet implemented.
 
-**Information asymmetry.** The Bellman solver knows $\kappa$; the model does not. However, the control zone comparison (Section 6.4) shows the model plans less at $\kappa = 0.7$ (4%) than at $\kappa \in [0.1, 0.25]$ (20%), consistent with the solver's predictions — indicating some sensitivity to signal dynamics despite not knowing $\kappa$ explicitly. A POMDP formulation would make the comparison strictly fair but is not required to interpret the current results.
+**Information asymmetry.** The Bellman solver knows $\kappa$; the model does not. However, the fast-reversion zone comparison (Section 6.4) shows the model plans less at $\kappa = 0.7$ (4%) than at $\kappa \in [0.1, 0.25]$ (20%), consistent with the solver's predictions — indicating some sensitivity to signal dynamics despite not knowing $\kappa$ explicitly. A POMDP formulation would make the comparison strictly fair but is not required to interpret the current results.
 
 **Small hard-decision counts.** The number of hard decisions per condition is small (11--23). Planning rates have wide confidence intervals and should be confirmed with larger samples.
 
@@ -193,7 +191,7 @@ The optimal policy knows $\kappa$; the model does not. However, hard decisions o
 
 We presented the first verifiable RLVR environment for sequential financial planning. The OU process provides exact Bellman solutions via Gauss-Hermite quadrature, bypassing the unknown-distribution obstacle of real markets. The parameter landscape (1,500 configurations) fully characterises where planning matters.
 
-Claude Opus 4 genuinely plans on 20% of hard decisions in the planning zone ($\kappa \in [0.1, 0.25]$), as verified by CoT inspection. In the control zone ($\kappa = 0.7$), genuine planning drops to 4% — consistent with planning being less valuable when the signal reverts quickly. A context prompt providing qualitative strategy knowledge does not help. The capability exists but is not reliably activated: on 80% of hard decisions where forward-looking reasoning would improve outcomes, the model defaults to myopic cost-benefit.
+Claude Opus 4 genuinely plans on 20% of hard decisions in the planning zone ($\kappa \in [0.1, 0.25]$), as verified by CoT inspection. In the fast-reversion zone ($\kappa = 0.7$), genuine planning drops to 4% — consistent with planning being less valuable when the signal reverts quickly. A context prompt providing qualitative strategy knowledge does not help. The capability exists but is not reliably activated: on 80% of hard decisions where forward-looking reasoning would improve outcomes, the model defaults to myopic cost-benefit.
 
 The 9 genuine planning instances all show empirical reasoning — trend recognition, horizon counting, amortisation logic — the model plans like a trader when it plans. The gap is not in knowledge or comprehension (97--99% easy accuracy) but in reliably constructing forward-looking reasoning from sequential observations.
 
@@ -243,15 +241,15 @@ All numbers verified against evaluation JSON files (corrected parser, raw text a
 |-----------|--------|----------------|-----------------|------|
 | Planning zone, original prompt | 97.1% | 23 | 6 | 26.1% |
 | Planning zone, context prompt | 97.7% | 17 | 5 | 29.4% |
-| Control zone, original prompt | 98.9% | 12 | 3 | 25.0% |
-| Control zone, context prompt | 98.0% | 11 | 2 | 18.2% |
+| Fast-reversion zone, original prompt | 98.9% | 12 | 3 | 25.0% |
+| Fast-reversion zone, context prompt | 98.0% | 11 | 2 | 18.2% |
 
 **CoT-verified planning by zone (both prompts combined):**
 
 | Zone | Hard decisions | Genuine planning | Rate |
 |------|----------------|------------------|------|
 | Planning ($\kappa = 0.1$--$0.25$) | 40 | 8 | 20.0% |
-| Control ($\kappa = 0.7$) | 23 | 1 | 4.3% |
+| Fast-reversion ($\kappa = 0.7$) | 23 | 1 | 4.3% |
 | Total | 63 | 9 | 14.3% |
 
 ### B. Genuine Planning Instances
@@ -309,5 +307,5 @@ All 9 instances share the same reasoning structure: (1) trend recognition from r
 | 9 | $\kappa$ inference (pilot) | IMPROVED | 5+5 | Identical behavior | Low |
 | 18 | **Planning zone, original** | **ORIGINAL** | **30** | **Easy 97.1%, 6/23 hard plan** | **High** |
 | 19 | **Planning zone, context** | **CONTEXT** | **30** | **Easy 97.7%, 5/17 hard plan** | **High** |
-| 20 | **Control zone, original** | **ORIGINAL** | **30** | **Easy 98.9%, 3/12 hard plan** | **High** |
-| 21 | **Control zone, context** | **CONTEXT** | **30** | **Easy 98.0%, 2/11 hard plan** | **High** |
+| 20 | **Fast-reversion zone, original** | **ORIGINAL** | **30** | **Easy 98.9%, 3/12 hard plan** | **High** |
+| 21 | **Fast-reversion zone, context** | **CONTEXT** | **30** | **Easy 98.0%, 2/11 hard plan** | **High** |

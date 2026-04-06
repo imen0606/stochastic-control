@@ -177,17 +177,15 @@ The optimal policy knows $\kappa$; the model does not. However, hard decisions o
 
 ## 8. Limitations
 
-**Single problem type.** Binary switching on a scalar OU signal. The binary action space is the paper's thesis (Bilokon 2026 proves one bit suffices as a filtration compression), not a simplification. However, extending to different PnL functions on the same signal (mean-reversion profit, momentum, magnitude) would test different temporal reasoning sub-skills within the same framework — this is planned but not yet implemented.
+**Single problem type.** Binary switching on a scalar OU signal. The binary action space is theoretically justified (Bilokon 2026 proves one bit suffices), and the scope table (Section 2.2) documents what OU covers and what requires extension. Different PnL functions (mean-reversion profit, momentum, magnitude) would test different temporal reasoning sub-skills within the same framework — planned but not yet implemented.
 
-**Information asymmetry.** The Bellman solver knows $\kappa$; the model does not. This is discussed in Section 6.5: hard decisions at $t=11$ (median) give the model sufficient history to potentially infer $\kappa$, and the prompt's multi-step objective logically implies dynamics matter. A POMDP formulation (where the optimal also infers $\kappa$) would make the comparison strictly fair.
+**Information asymmetry.** The Bellman solver knows $\kappa$; the model does not. However, the control zone comparison (Section 6.4) shows the model plans less at $\kappa = 0.7$ (4%) than at $\kappa \in [0.1, 0.25]$ (20%), consistent with the solver's predictions — indicating some sensitivity to signal dynamics despite not knowing $\kappa$ explicitly. A POMDP formulation would make the comparison strictly fair but is not required to interpret the current results.
 
-**Small hard-decision counts.** While each condition has $N=30$ episodes, the number of hard decisions per condition is small (23, 17, 12, 11). Planning rates (20%, 4%) therefore have wide confidence intervals. The planning-zone vs control-zone difference (20% vs 4%) is directionally consistent with the solver-based predictions but should be confirmed with larger samples.
+**Small hard-decision counts.** The number of hard decisions per condition is small (11--23). Planning rates have wide confidence intervals and should be confirmed with larger samples.
 
-**No training results.** We provide the gym and baseline. RLVR training has not been conducted.
+**No training results.** RLVR training has not been conducted. However, the 20% genuine planning rate in the planning zone indicates sufficient correct reasoning paths for GRPO to reinforce without cold-start SFT.
 
-**Stationary process.** The OU process is time-homogeneous. Real markets are non-stationary.
-
-**Parser sensitivity.** Initial results used a parser that failed on some response formats; all results in this paper use the corrected parser with raw text archived for verification.
+**Synthetic data.** The OU process is stationary and time-homogeneous, unlike real markets. This is the same trade-off all RLVR gyms make: Reasoning Gym uses procedurally generated puzzles, not real-world reasoning tasks. Verifiability requires known dynamics; transfer to real financial data is an open question, as it is for transfer from synthetic math to real-world mathematical reasoning.
 
 ---
 

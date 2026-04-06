@@ -1,6 +1,6 @@
 # Strategy-Relative Regime Switching as a Verifiable RLVR Environment for Financial Planning
 
-**Imen Ayadi**
+**Imen**
 
 *Draft (Preliminary) — April 2026*
 

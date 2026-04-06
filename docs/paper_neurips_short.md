@@ -113,9 +113,7 @@ $^1$ *Why $\kappa$ alone, not $\kappa \times T$:* $\kappa$ measures per-step sig
 
 ## 5. The Planning Mechanism
 
-The greedy agent switches ON when $\alpha z > \lambda$ (immediate gain exceeds cost), giving threshold $z > \lambda/\alpha = 0.50$ at our evaluation configuration. The optimal agent switches ON at $z > 0.22$ — more aggressive because it amortises the one-time switching cost over persistent future gains. This was verified by direct Q-value computation from the Bellman table.
-
-The **disagreement zone** $z \in [0.22, 0.50]$ (for OFF→ON) is where planning changes the decision. At the terminal step, optimal reduces to greedy exactly (no future). The zone widens backward in time. Both policies exhibit hysteresis: ON→OFF thresholds are symmetric around zero.
+The greedy agent switches ON when immediate gain exceeds switching cost: $\alpha z > \lambda$, giving threshold $z > \lambda/\alpha$. The optimal agent switches ON at a lower threshold because it amortises the one-time switching cost over persistent future gains. For example, at $\lambda/\alpha = 0.50$, the greedy threshold is $z > 0.50$ while the optimal threshold is $z > 0.22$ — verified by direct Q-value computation. The **disagreement zone** between the two thresholds is where planning changes the decision. At the terminal step, optimal reduces to greedy exactly (no future to plan for). Both policies exhibit hysteresis: ON→OFF thresholds are symmetric.
 
 ---
 
@@ -157,13 +155,9 @@ Representative genuine planning instances:
 
 These two instances from the original fixed-$\kappa$ eval are now supplemented by 7 more across the varied conditions, all showing the same pattern: the model recognises signal trend, counts remaining horizon, reasons about amortisation of switching cost, and overrides the greedy decision. The model plans like a trader when it plans.
 
-### 6.4 Temporal Distribution
+### 6.4 Information Asymmetry and the Control Zone
 
-In the fixed-$\kappa$ evaluation, hard decisions occurred at median $t=11$, where the model has observed ~11 signals — sufficient data to potentially estimate signal persistence. The temporal distribution analysis from that evaluation remains valid: hard decisions cluster in the middle of episodes where the signal is near the disagreement zone boundary.
-
-### 6.5 Information Asymmetry and the Control Zone
-
-The optimal policy knows $\kappa$; the model does not. The control zone ($\kappa = 0.7$) directly tests whether the model's planning behavior responds to signal dynamics. At $\kappa = 0.7$, genuine planning drops to 4% (1/23 hard decisions), down from 20% (8/40) in the planning zone. This is consistent with planning being less valuable at fast reversion — the solver's disagreement rate at $\kappa = 0.7$ is only 1.2% versus 13.1% at $\kappa = 0.1$. The model plans less when planning is less valuable, suggesting some sensitivity to signal dynamics even without explicit $\kappa$ knowledge.
+The optimal policy knows $\kappa$; the model does not. However, hard decisions occur at median $t=11$, where the model has observed ~11 signals — sufficient data to potentially estimate signal persistence. The control zone ($\kappa = 0.7$) directly tests whether the model's planning behavior responds to signal dynamics: genuine planning drops to 4% (1/23 hard decisions), down from 20% (8/40) in the planning zone. This is consistent with the solver's disagreement rate ($\kappa = 0.7$: 1.2% vs $\kappa = 0.1$: 13.1%). The model plans less when planning is less valuable, suggesting some sensitivity to signal dynamics even without explicit $\kappa$ knowledge.
 
 ---
 
@@ -247,8 +241,8 @@ All numbers verified against evaluation JSON files (corrected parser, raw text a
 
 **LLM evaluation (4 conditions, $N=30$ each):**
 
-| Condition | Easy % | Hard decisions | Genuine planning | Rate |
-|-----------|--------|----------------|------------------|------|
+| Condition | Easy % | Hard decisions | Matched optimal | Rate |
+|-----------|--------|----------------|-----------------|------|
 | Planning zone, original prompt | 97.1% | 23 | 6 | 26.1% |
 | Planning zone, context prompt | 97.7% | 17 | 5 | 29.4% |
 | Control zone, original prompt | 98.9% | 12 | 3 | 25.0% |
@@ -311,7 +305,7 @@ All 9 instances share the same reasoning structure: (1) trend recognition from r
 | 3 | Parameter sweep | N/A | 1,500 | $\kappa$ dominant | High |
 | 4 | T=1 accuracy, old prompt | OLD | 10 | ~20% | High |
 | 5 | T=1 accuracy, improved | IMPROVED | 10 | ~80% | High |
-| 6 | Main eval (fixed $\kappa$) | IMPROVED | 30 (750 dec) | Easy 99.3%, Hard 5.9% | High |
+| 6 | Main eval (fixed $\kappa=0.1$) | IMPROVED | 30 (750 dec) | Easy 99.3%, Hard 5.9% — superseded by tests 18--21 | Medium |
 | 7 | Scaffolded test | SCAFFOLD | 1 | 25/25 (scaffold planned) | Medium |
 | 8 | Manual minimal | IMPROVED | 1 | 9/9 easy, 0/1 hard | Medium |
 | 9 | $\kappa$ inference (pilot) | IMPROVED | 5+5 | Identical behavior | Low |

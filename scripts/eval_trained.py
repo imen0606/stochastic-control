@@ -77,17 +77,43 @@ def run_episode(model, tokenizer, problem, max_new_tokens=300):
     return decisions, raw_texts
 
 
+def _has_plannable_hard(problem, min_t=2, trend_thr=0.6):
+    """Check if episode has at least one plannable hard decision."""
+    z_grid = _compute_z_grid(problem.theta, problem.sigma_z, problem.kappa, 200)
+    prev = problem.initial_regime
+    for t in range(problem.T):
+        zi = int(np.argmin(np.abs(z_grid - problem.z_path[t])))
+        oa = int(problem.optimal_policy_table[t, zi, prev])
+        qoff = 0.0 - (problem.lam if 0 != prev else 0.0)
+        qon = problem.alpha * problem.z_path[t] - (problem.lam if 1 != prev else 0.0)
+        ga = 1 if qon > qoff else 0
+        if oa != ga and t >= min_t:
+            history = problem.z_path[:t]
+            if oa == 1:
+                tf = sum(1 for z in history if z > 0) / len(history)
+            else:
+                tf = sum(1 for z in history if z < 0) / len(history)
+            if tf >= trend_thr:
+                return True
+        prev = oa
+    return False
+
+
 def evaluate(model, tokenizer, N=100, seed_start=10000):
-    """Evaluate model on N fresh episodes."""
+    """Evaluate model on N filtered episodes (each has >=1 plannable hard decision)."""
     config = GeneratorConfig.planning_zone()
     gen = RegimeSwitchingGenerator(config)
 
     results = []
     total_easy_c = total_easy_t = total_hard_o = total_hard_t = 0
 
-    for i in range(N):
-        seed = seed_start + i
+    seed = seed_start
+    count = 0
+    while count < N:
         p = gen.sample(seed=seed)
+        seed += 1
+        if not _has_plannable_hard(p):
+            continue
 
         t0 = time.time()
         decisions, raw_texts = run_episode(model, tokenizer, p)
@@ -132,15 +158,16 @@ def evaluate(model, tokenizer, N=100, seed_start=10000):
         total_hard_t += ht
 
         results.append({
-            "seed": seed, "kappa": p.kappa, "T": p.T,
+            "seed": p.seed, "kappa": p.kappa, "T": p.T,
             "easy_correct": ec, "easy_total": et,
             "hard_opt": ho, "hard_total": ht,
             "j_model": j_model, "j_opt": j_opt, "j_gre": j_gre,
             "decisions": decisions, "raw_texts": raw_texts,
         })
 
+        count += 1
         print(
-            f"  [{i+1}/{N}] seed={seed} T={p.T} "
+            f"  [{count}/{N}] seed={p.seed} T={p.T} "
             f"easy={ec}/{et} hard={ho}/{ht} "
             f"J={j_model:+.3f} ({elapsed:.0f}s)",
             flush=True,

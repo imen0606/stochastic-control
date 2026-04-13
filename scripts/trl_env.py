@@ -91,6 +91,7 @@ class RegimeSwitchingEnv:
         self.gen = RegimeSwitchingGenerator(GeneratorConfig.planning_zone())
         self.verifier = RegimeSwitchingVerifier()
         self.reward = 0.0
+        self._reward_computed = False
 
         # Episode state
         self.problem = None
@@ -116,6 +117,7 @@ class RegimeSwitchingEnv:
         self.prev_regime = problem.initial_regime
         self.completions = []
         self.reward = 0.0
+        self._reward_computed = False
 
         # Return system prompt + first step as initial observation
         system = setup_prompt(problem)
@@ -135,6 +137,13 @@ class RegimeSwitchingEnv:
         Returns:
             The next time step's observation, or signals episode completion.
         """
+        # If episode is already done, always raise
+        if self.t >= self.problem.T:
+            if not self._reward_computed:
+                self.reward = self._compute_reward()
+                self._reward_computed = True
+            raise ValueError("Episode complete. All time steps decided.")
+
         # Record the completion
         self.completions.append(reasoning_and_decision)
 
@@ -147,6 +156,7 @@ class RegimeSwitchingEnv:
         if self.t >= self.problem.T:
             # Compute reward
             self.reward = self._compute_reward()
+            self._reward_computed = True
             raise ValueError("Episode complete. All time steps decided.")
 
         # Return next observation

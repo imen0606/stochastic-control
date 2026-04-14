@@ -32,9 +32,11 @@ echo "(Need at least 80GB free)"
 echo ""
 
 # 1. Install dependencies
+# IMPORTANT: transformers@main is required for environment_factory (needs >=5.2.0)
+# peft>=0.15.0 is required for compatibility with transformers@main
 echo "[1/4] Installing dependencies..."
-pip install -q "vllm>=0.17.0,<0.18.0" trl transformers datasets scipy numpy peft
 pip install -q git+https://github.com/huggingface/transformers.git@main
+pip install -q "vllm>=0.17.0,<0.18.0" "trl>=0.20.0" "peft>=0.15.0" datasets scipy numpy
 
 # 2. Clone/update repo
 echo "[2/4] Setting up repository..."

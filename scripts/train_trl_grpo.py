@@ -57,6 +57,9 @@ def main():
         args.num_episodes = 32
         args.epochs = 1
         args.num_generations = 2
+        args.max_completion_length = 4096
+    else:
+        args.max_completion_length = 6144
 
     # System prompt for the agent
     SYSTEM_PROMPT = (
@@ -104,22 +107,41 @@ def main():
     print(f"  K (generations per episode): {args.num_generations}")
     print(f"  Epochs: {args.epochs}")
     print(f"  LR: {args.lr}")
+    print(f"  Max completion length: {args.max_completion_length}")
     print(f"  Output: {args.output_dir}")
     print(f"  Test mode: {args.test}")
 
-    # If SFT adapter exists, merge it into the base model first
+    # If SFT adapter exists, merge it and save as a full model on disk
+    # (avoids keeping two copies in memory during GRPO init)
     model_ref = args.model
     if sft_adapter_path:
-        from transformers import AutoModelForCausalLM
         import torch
-        print(f"Loading base model + SFT adapter...")
-        base_model = AutoModelForCausalLM.from_pretrained(
-            args.model, torch_dtype=torch.bfloat16,
-        )
-        from peft import PeftModel
-        model_ref = PeftModel.from_pretrained(base_model, sft_adapter_path)
-        model_ref = model_ref.merge_and_unload()
-        print(f"  Merged SFT adapter into base model")
+        merged_path = os.path.join(os.path.dirname(sft_adapter_path), "merged_for_grpo")
+        if os.path.exists(os.path.join(merged_path, "config.json")):
+            print(f"Using previously merged model at {merged_path}")
+            model_ref = merged_path
+        else:
+            from transformers import AutoModelForCausalLM
+            from peft import PeftModel
+            print(f"Loading base model + SFT adapter...")
+            base_model = AutoModelForCausalLM.from_pretrained(
+                args.model, torch_dtype=torch.bfloat16,
+            )
+            merged = PeftModel.from_pretrained(base_model, sft_adapter_path)
+            merged = merged.merge_and_unload()
+            print(f"  Merged SFT adapter. Saving to {merged_path}...")
+            merged.save_pretrained(merged_path)
+            # Also copy tokenizer from base model cache
+            from transformers import AutoTokenizer
+            tok = AutoTokenizer.from_pretrained(args.model)
+            tok.save_pretrained(merged_path)
+            # Free memory before GRPO loads its own copies
+            del merged, base_model
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            import gc; gc.collect()
+            print(f"  Saved merged model and freed memory")
+            model_ref = merged_path
 
     trainer_kwargs = dict(
         model=model_ref,
@@ -131,21 +153,24 @@ def main():
             # vLLM for fast generation (colocate = single GPU)
             use_vllm=True,
             vllm_mode="colocate",
+            vllm_gpu_memory_utilization=0.4,  # limit vLLM to 40% GPU (rest for training)
 
             # GRPO hyperparameters
             num_generations=args.num_generations,
-            max_completion_length=8192,  # J-gap zone: T=50-100 steps, ~80 tokens/step
+            max_prompt_length=512,  # prompt is just a system message, very short
+            max_completion_length=args.max_completion_length,
             per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
+            gradient_accumulation_steps=2,  # reduced from 4 for lower peak memory
             gradient_checkpointing=True,
             num_train_epochs=args.epochs,
             learning_rate=args.lr,
+            bf16=True,
 
             # Logging
             logging_steps=5,
-            save_steps=500,  # save less frequently to save disk
-            save_total_limit=2,  # keep only last 2 checkpoints
-            log_completions=True,
+            save_steps=500,
+            save_total_limit=2,
+            log_completions=False,  # save memory (completions can be very long)
             report_to="none",
 
             # Disable thinking mode for cleaner outputs

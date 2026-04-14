@@ -59,7 +59,6 @@ def load_vllm_model(model_path, base_model=None):
             max_lora_rank=64,
             max_model_len=4096,
             gpu_memory_utilization=0.8,
-            enable_thinking=False,
         )
         lora_req = LoRARequest("trained", 1, adapter_path)
     else:
@@ -67,7 +66,6 @@ def load_vllm_model(model_path, base_model=None):
             model=model_path,
             max_model_len=4096,
             gpu_memory_utilization=0.8,
-            enable_thinking=False,
         )
         lora_req = None
 
@@ -95,7 +93,8 @@ def run_episode(llm, sampling, lora_req, tokenizer, problem):
 
         # Build prompt via chat template
         prompt = tokenizer.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
+            messages, tokenize=False, add_generation_prompt=True,
+            enable_thinking=False,
         )
 
         # Generate with vLLM

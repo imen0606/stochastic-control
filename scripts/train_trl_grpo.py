@@ -17,7 +17,7 @@ Designed for 7B models on single A100 80GB with LoRA to fit in memory.
 
 Usage on RunPod:
     # Step 1: Test model can follow multi-turn (ALWAYS DO THIS FIRST)
-    python scripts/test_model_multiturn.py --model Qwen/Qwen3-7B
+    python scripts/test_model_multiturn.py --model Qwen/Qwen3-8B
 
     # Step 2: Quick training test (32 episodes, ~30 min)
     python scripts/train_trl_grpo.py --test
@@ -39,7 +39,7 @@ from scripts.trl_env import RegimeSwitchingEnv, reward_func
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", default="Qwen/Qwen3-7B")
+    parser.add_argument("--model", default="Qwen/Qwen3-8B")
     parser.add_argument("--output-dir", default="output/grpo_planning")
     parser.add_argument("--num-episodes", type=int, default=5000)
     parser.add_argument("--num-generations", type=int, default=4,

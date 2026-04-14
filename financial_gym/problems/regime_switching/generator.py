@@ -117,6 +117,28 @@ class GeneratorConfig:
         )
 
     @classmethod
+    def j_gap_zone(cls) -> "GeneratorConfig":
+        """Config targeting large J gap (J_optimal - J_greedy) for GRPO training.
+
+        Found via parameter sweep over 3,024 configs x 20 episodes.
+        In this zone greedy captures only 30-60% of J_optimal, giving
+        GRPO a strong economic signal to learn planning.
+
+        Key drivers of J gap:
+          - Low kappa (persistent signals -> planning over many steps)
+          - High lambda/alpha ratio (costly switches -> greedy over-trades)
+          - Long horizon (more steps for planning advantage to compound)
+        """
+        return cls(
+            kappa_range=(0.01, 0.10),
+            alpha_range=(0.1, 0.5),
+            lam_alpha_ratio_range=(2.0, 5.0),
+            sigma_z_range=(0.1, 0.5),
+            sigma_x_range=(0.1, 0.3),
+            T_range=(50, 100),
+        )
+
+    @classmethod
     def control_zone(cls) -> "GeneratorConfig":
         """Config for the control zone where greedy ≈ optimal.
 

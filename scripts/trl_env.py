@@ -88,7 +88,7 @@ class RegimeSwitchingEnv:
     """
 
     def __init__(self):
-        self.gen = RegimeSwitchingGenerator(GeneratorConfig.planning_zone())
+        self.gen = RegimeSwitchingGenerator(GeneratorConfig.j_gap_zone())
         self.verifier = RegimeSwitchingVerifier()
         self.reward = 0.0
         self._reward_computed = False
@@ -100,28 +100,24 @@ class RegimeSwitchingEnv:
         self.completions = []
 
     def reset(self, **kwargs) -> str:
-        """Sample a new episode with at least one plannable hard decision.
+        """Sample a new episode in the J-gap zone.
 
         Returns the system prompt + first observation as the initial context.
+        In the J-gap zone (low kappa, high switching cost, long horizon),
+        the economic gap between optimal and greedy is large enough for
+        GRPO to learn from raw J directly.
         """
-        # Sample until we get an episode with a plannable hard decision
-        max_attempts = 50
-        for _ in range(max_attempts):
-            seed = _next_seed()
-            problem = self.gen.sample(seed=seed)
-            if _has_plannable_hard_decision(problem):
-                break
-
-        self.problem = problem
+        seed = _next_seed()
+        self.problem = self.gen.sample(seed=seed)
         self.t = 0
-        self.prev_regime = problem.initial_regime
+        self.prev_regime = self.problem.initial_regime
         self.completions = []
         self.reward = 0.0
         self._reward_computed = False
 
         # Return system prompt + first step as initial observation
-        system = setup_prompt(problem)
-        first_step = step_prompt(0, problem.z_path[0], self.prev_regime)
+        system = setup_prompt(self.problem)
+        first_step = step_prompt(0, self.problem.z_path[0], self.prev_regime)
         return f"{system}\n\n{first_step}"
 
     def decide(self, reasoning_and_decision: str) -> str:
@@ -163,45 +159,31 @@ class RegimeSwitchingEnv:
         return step_prompt(self.t, self.problem.z_path[self.t], self.prev_regime)
 
     def _compute_reward(self) -> float:
-        """Compute regret-normalised reward from the episode's decisions."""
+        """Compute reward from the episode's decisions.
+
+        Uses raw J (realized utility) as the reward. GRPO computes
+        advantage_i = reward_i - mean(rewards_1..K) within each episode's
+        K completions, which automatically normalises for per-episode scale.
+
+        In the J-gap zone, the ranking is:
+          optimal (~6.6) > greedy (~3.2) > always_on (~2.3) > always_off (~-0.6) > random (~-36)
+        so better planning is directly rewarded through higher J.
+
+        Clipped to [-20, 20] for gradient stability.
+        """
         # Build decision array from completions
         decisions = np.array(
             [_parse_decision(c) for c in self.completions],
             dtype=np.int8,
         )
 
-        # Compute J values
+        # Compute J (realized utility) from model's decisions
         j_model = _compute_realized_utility(
             decisions, self.problem.x_path, self.problem.lam,
             self.problem.initial_regime, _linear_utility,
         )
 
-        # Compute random baseline (average over multiple random seeds)
-        rng = np.random.default_rng(self.problem.seed + 99999)
-        j_randoms = []
-        for _ in range(20):
-            random_d = rng.integers(0, 2, size=self.problem.T).astype(np.int8)
-            j_r = _compute_realized_utility(
-                random_d, self.problem.x_path, self.problem.lam,
-                self.problem.initial_regime, _linear_utility,
-            )
-            j_randoms.append(j_r)
-        j_random = np.mean(j_randoms)
-
-        # Compute optimal J
-        from financial_gym.agents.optimal_agent import OptimalAgent
-        opt_d = OptimalAgent().decide(self.problem)
-        j_optimal = _compute_realized_utility(
-            opt_d, self.problem.x_path, self.problem.lam,
-            self.problem.initial_regime, _linear_utility,
-        )
-
-        # Regret-normalised score
-        denom = j_optimal - j_random
-        if abs(denom) < 0.001:
-            return 1.0 if abs(j_model - j_optimal) < 0.001 else 0.0
-
-        return float(np.clip((j_model - j_random) / denom, -2.0, 2.0))
+        return float(np.clip(j_model, -20.0, 20.0))
 
 
 def reward_func(environments, **kwargs) -> list[float]:

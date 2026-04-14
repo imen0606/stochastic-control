@@ -5,16 +5,24 @@ GRPO training on the regime switching gym using TRL.
 Uses environment_factory for true multi-turn sequential decisions.
 The model sees one signal at a time and must decide before the next.
 
+Training Run 2 changes (J-gap zone):
+  - Zone: kappa=[0.01,0.10], ratio=[2.0,5.0], T=[50,100]
+    (greedy captures only 30-60% of J_optimal, vs 95% in old zone)
+  - Reward: raw J (realized utility), no normalization
+    (GRPO advantage within K group handles per-episode scale)
+  - K=4 (was 8) and max_completion_length=16384 (was 4096)
+    to accommodate longer episodes (50-100 steps)
+
 Designed for 7B models on single A100 80GB with LoRA to fit in memory.
 
 Usage on RunPod:
     # Step 1: Test model can follow multi-turn (ALWAYS DO THIS FIRST)
     python scripts/test_model_multiturn.py --model Qwen/Qwen3-7B
 
-    # Step 2: Quick training test (64 episodes, ~30 min)
+    # Step 2: Quick training test (32 episodes, ~30 min)
     python scripts/train_trl_grpo.py --test
 
-    # Step 3: Full training (5000 episodes, ~6 hours)
+    # Step 3: Full training (5000 episodes, ~8-12 hours)
     python scripts/train_trl_grpo.py
 """
 import argparse
@@ -34,8 +42,8 @@ def main():
     parser.add_argument("--model", default="Qwen/Qwen3-7B")
     parser.add_argument("--output-dir", default="output/grpo_planning")
     parser.add_argument("--num-episodes", type=int, default=5000)
-    parser.add_argument("--num-generations", type=int, default=8,
-                        help="K completions per episode for GRPO")
+    parser.add_argument("--num-generations", type=int, default=4,
+                        help="K completions per episode for GRPO (reduced from 8 for longer episodes)")
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=5e-6)
     parser.add_argument("--test", action="store_true",
@@ -46,9 +54,9 @@ def main():
     args = parser.parse_args()
 
     if args.test:
-        args.num_episodes = 64
+        args.num_episodes = 32
         args.epochs = 1
-        args.num_generations = 4
+        args.num_generations = 2
 
     # System prompt for the agent
     SYSTEM_PROMPT = (
@@ -101,9 +109,9 @@ def main():
 
             # GRPO hyperparameters
             num_generations=args.num_generations,
-            max_completion_length=4096,  # multi-turn needs space
+            max_completion_length=16384,  # J-gap zone: T=50-100 steps, ~100 tokens/step
             per_device_train_batch_size=1,
-            gradient_accumulation_steps=8,
+            gradient_accumulation_steps=4,
             num_train_epochs=args.epochs,
             learning_rate=args.lr,
 

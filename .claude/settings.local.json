@@ -43,7 +43,18 @@
       "Bash(grep -v grep echo --- tail -15 docs/data/eval_run_log.txt 2)",
       "Bash(/dev/null echo:*)",
       "Bash(xargs -I{} echo \"Processes running: {}\")",
-      "Bash(xargs -I{} echo \"Processes still running: {}\")"
+      "Bash(xargs -I{} echo \"Processes still running: {}\")",
+      "Bash(git push:*)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -r \"GRPO\\\\|grpo\\\\|reward\\\\|training\" /Users/imen/Documents/stochastic_control/docs/*.md)",
+      "Bash(python3 docs/make_slide.py)",
+      "Bash(python scripts/test_reward.py --episodes 10)",
+      "Bash(python3 scripts/test_reward.py --episodes 10)",
+      "Bash(python3 scripts/test_reward.py --episodes 30)",
+      "Bash(python3 -c ':*)",
+      "Bash(python3)",
+      "Bash(grep -r \"training\\\\|GRPO\\\\|TRL\" /Users/imen/Documents/stochastic_control/docs/*.md)",
+      "Bash(python3 scripts/trl_env.py)"
     ]
   }
 }

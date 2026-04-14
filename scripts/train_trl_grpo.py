@@ -134,9 +134,10 @@ def main():
 
             # GRPO hyperparameters
             num_generations=args.num_generations,
-            max_completion_length=16384,  # J-gap zone: T=50-100 steps, ~100 tokens/step
+            max_completion_length=8192,  # J-gap zone: T=50-100 steps, ~80 tokens/step
             per_device_train_batch_size=1,
             gradient_accumulation_steps=4,
+            gradient_checkpointing=True,
             num_train_epochs=args.epochs,
             learning_rate=args.lr,
 

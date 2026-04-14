@@ -73,6 +73,16 @@ def main():
         ] * args.num_episodes
     })
 
+    # Check if --model is a LoRA adapter checkpoint (from SFT warmup)
+    sft_adapter_path = None
+    if os.path.isdir(args.model) and os.path.exists(os.path.join(args.model, "adapter_config.json")):
+        from peft import PeftConfig
+        peft_cfg = PeftConfig.from_pretrained(args.model)
+        sft_adapter_path = args.model
+        args.model = peft_cfg.base_model_name_or_path
+        print(f"Detected LoRA adapter at {sft_adapter_path}")
+        print(f"  Base model: {args.model}")
+
     # LoRA config for memory efficiency on 7B models
     peft_config = None
     if args.use_lora:
@@ -88,6 +98,7 @@ def main():
 
     print(f"Starting GRPO training:")
     print(f"  Model: {args.model}")
+    print(f"  SFT adapter: {sft_adapter_path or 'None'}")
     print(f"  LoRA: {args.use_lora}")
     print(f"  Episodes: {args.num_episodes}")
     print(f"  K (generations per episode): {args.num_generations}")
@@ -96,8 +107,22 @@ def main():
     print(f"  Output: {args.output_dir}")
     print(f"  Test mode: {args.test}")
 
+    # If SFT adapter exists, merge it into the base model first
+    model_ref = args.model
+    if sft_adapter_path:
+        from transformers import AutoModelForCausalLM
+        import torch
+        print(f"Loading base model + SFT adapter...")
+        base_model = AutoModelForCausalLM.from_pretrained(
+            args.model, torch_dtype=torch.bfloat16,
+        )
+        from peft import PeftModel
+        model_ref = PeftModel.from_pretrained(base_model, sft_adapter_path)
+        model_ref = model_ref.merge_and_unload()
+        print(f"  Merged SFT adapter into base model")
+
     trainer_kwargs = dict(
-        model=args.model,
+        model=model_ref,
         reward_funcs=reward_func,
         train_dataset=dataset,
         args=GRPOConfig(

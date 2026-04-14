@@ -88,7 +88,11 @@ class RegimeSwitchingEnv:
     """
 
     def __init__(self):
-        self.gen = RegimeSwitchingGenerator(GeneratorConfig.j_gap_zone())
+        # Use J-gap zone but with shorter T so episodes fit in 4096 tokens
+        # (~100 tokens/step => T=30 needs ~3000 tokens, safely within limit)
+        cfg = GeneratorConfig.j_gap_zone()
+        cfg.T_range = (15, 30)  # override: was (50, 100), too long for 4096 tokens
+        self.gen = RegimeSwitchingGenerator(cfg)
         self.verifier = RegimeSwitchingVerifier()
         self.reward = 0.0
         self._reward_computed = False

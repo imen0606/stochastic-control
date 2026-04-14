@@ -57,14 +57,14 @@ def load_vllm_model(model_path, base_model=None):
             model=model_path,
             enable_lora=True,
             max_lora_rank=64,
-            max_model_len=4096,
+            max_model_len=8192,
             gpu_memory_utilization=0.8,
         )
         lora_req = LoRARequest("trained", 1, adapter_path)
     else:
         llm = LLM(
             model=model_path,
-            max_model_len=4096,
+            max_model_len=8192,
             gpu_memory_utilization=0.8,
         )
         lora_req = None

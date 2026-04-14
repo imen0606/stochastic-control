@@ -157,7 +157,6 @@ def main():
 
             # GRPO hyperparameters
             num_generations=args.num_generations,
-            max_prompt_length=512,  # prompt is just a system message, very short
             max_completion_length=args.max_completion_length,
             per_device_train_batch_size=1,
             gradient_accumulation_steps=2,  # reduced from 4 for lower peak memory

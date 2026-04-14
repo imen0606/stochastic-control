@@ -59,7 +59,7 @@ def main():
         args.num_generations = 2
         args.max_completion_length = 4096
     else:
-        args.max_completion_length = 6144
+        args.max_completion_length = 4096
 
     # System prompt for the agent
     SYSTEM_PROMPT = (

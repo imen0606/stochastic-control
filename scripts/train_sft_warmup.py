@@ -83,15 +83,12 @@ def main():
             per_device_train_batch_size=1,
             gradient_accumulation_steps=4,
             learning_rate=args.lr,
-            max_seq_length=16384,
+            max_length=16384,
             logging_steps=10,
             save_steps=100,
             save_total_limit=2,
             report_to="none",
             bf16=True,
-
-            # Disable thinking mode for cleaner outputs
-            dataset_kwargs={"skip_prepare_dataset": True},
         ),
     )
 
